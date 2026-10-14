@@ -1,0 +1,41 @@
+name: 📝 题目纠错
+description: 某道题的答案、解析、公式或知识点有误
+title: '[题目] '
+labels: ['题库', '需要核对']
+body:
+  - type: markdown
+    attributes:
+      value: |
+        题目质量是这个项目的生命线。请尽量注明依据（官方答案册页码、年份等），
+        没有可靠来源的修改我们无法合并。
+
+  - type: input
+    id: source
+    attributes:
+      label: 题目来源
+      placeholder: '2024 第十六届CMC预赛 非数学A类 填空3'
+    validations:
+      required: true
+
+  - type: textarea
+    id: wrong
+    attributes:
+      label: 哪里不对
+      description: 是答案错、解析错、公式渲染错，还是知识点标错？
+    validations:
+      required: true
+
+  - type: textarea
+    id: correct
+    attributes:
+      label: 正确内容
+    validations:
+      required: true
+
+  - type: input
+    id: evidence
+    attributes:
+      label: 依据来源
+      placeholder: '官方参考答案第 X 页 / 某年真题 PDF'
+    validations:
+      required: true
