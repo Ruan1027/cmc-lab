@@ -7,6 +7,7 @@
  */
 import type { ExamGroup, ExamRecord, HistoryEntry, Problem, Settings, Stats, WrongEntry } from '../types';
 import { DEFAULT_SETTINGS } from './defaults';
+import { GROUP_OPTIONS } from '../core/groups';
 
 export interface PracticeSnapshot {
   queue: string[];
@@ -52,8 +53,9 @@ export function loadState(): PersistedState {
     const parsed = JSON.parse(raw) as Partial<PersistedState>;
     const base = emptyState();
     const settings = { ...base.settings, ...(parsed.settings || {}) };
-    // 校验组别，避免旧数据里的无效值
-    if (!['非数学A类', '非数学B类', '非数学类'].includes(settings.group)) {
+    // 校验组别：以 GROUP_OPTIONS 为准，避免旧数据残留无效值后出现空白页
+    const validGroups = GROUP_OPTIONS.map((o) => o.value);
+    if (!validGroups.includes(settings.group)) {
       settings.group = DEFAULT_SETTINGS.group as ExamGroup;
     }
     return {
@@ -72,7 +74,14 @@ export function loadState(): PersistedState {
   }
 }
 
-export function saveState(state: PersistedState): void {
+/**
+ * 写入持久化状态，返回是否成功。
+ *
+ * 返回布尔值而不是静默吞掉异常：localStorage 写满（QuotaExceededError）时
+ * 数据其实没存上，若不告知用户，他会以为进度已保存，下次打开全没了——
+ * 这是最伤用户的失败方式，必须让上层有机会提示导出备份。
+ */
+export function saveState(state: PersistedState): boolean {
   try {
     const trimmed: PersistedState = {
       ...state,
@@ -80,8 +89,9 @@ export function saveState(state: PersistedState): void {
       exams: state.exams.slice(-50),
     };
     localStorage.setItem(KEY, JSON.stringify(trimmed));
+    return true;
   } catch {
-    // 存储写满时静默失败，由上层提示导出备份
+    return false;
   }
 }
 

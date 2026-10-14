@@ -28,7 +28,7 @@ export function ExamPage() {
   const settings = useAppStore((s) => s.settings);
   const exams = useAppStore((s) => s.exams);
   const addExamRecord = useAppStore((s) => s.addExamRecord);
-  const recordResult = useAppStore((s) => s.recordResult);
+  const recordResults = useAppStore((s) => s.recordResults);
   const review = useAppStore((s) => s.startSession);
 
   const papers = useMemo(() => {
@@ -93,40 +93,37 @@ export function ExamPage() {
     setNow(Date.now());
   }
 
-  function saveDraft(text?: string): Record<string, ExamAnswer> {
-    if (!run || !cur) return {};
-    const prev = run.answers[cur.id];
-    if (cur.type === 'fill') {
-      const el = document.getElementById('ex-fill') as HTMLInputElement | null;
-      const v = text ?? el?.value ?? '';
-      if (v.trim()) return { ...run.answers, [cur.id]: { kind: 'fill', text: v.trim() } as ExamAnswer };
-      return run.answers;
-    }
-    if (cur.type === 'proof') {
-      const el = document.getElementById('ex-proof') as HTMLTextAreaElement | null;
-      const v = text ?? el?.value ?? '';
-      return {
-        ...run.answers,
-        [cur.id]: { kind: 'self', grade: (prev && prev.kind === 'self' ? prev.grade : 'wrong'), text: v } as ExamAnswer,
-      };
-    }
-    return run.answers;
+  /** 写入某一题的作答（输入框是受控的，每次 onChange 都会走到这里，无需读 DOM） */
+  function setAnswer(ans: ExamAnswer) {
+    if (!run || !cur) return;
+    setRun({ ...run, answers: { ...run.answers, [cur.id]: ans } });
+  }
+
+  /** 取某题已保存的文本，供受控输入回填 */
+  function textOf(id: string): string {
+    const a = run?.answers[id];
+    return a && 'text' in a ? (a.text ?? '') : '';
   }
 
   function finish(auto: boolean) {
     if (!run) return;
     const target = papers.find((p) => p.name === run.source);
     if (!target) return;
-    const answers = saveDraft();
+    const answers = run.answers;
     const res = gradeExam(target.list, answers);
     const used = Math.max(1, Math.round((Date.now() - run.startedAt) / 60000));
-    target.list.forEach((p, i) => {
-      const d = res.detail[i];
-      if (!d) return;
-      const a = answers[p.id];
-      const ua = a && 'text' in a ? String(a.text ?? '') : '';
-      recordResult(p, d.result, ua);
-    });
+    // 整卷一次性提交，避免逐题写 localStorage
+    recordResults(
+      target.list.map((p, i) => {
+        const d = res.detail[i];
+        const a = answers[p.id];
+        return {
+          p,
+          result: d.result,
+          ua: a && 'text' in a ? String(a.text ?? '') : '',
+        };
+      }),
+    );
     addExamRecord({
       ts: Date.now(),
       source: run.source,
@@ -147,11 +144,13 @@ export function ExamPage() {
 
   function pick(letter: string, grade?: 'correct' | 'partial' | 'wrong') {
     if (!run || !cur) return;
+    const prev = run.answers[cur.id];
+    const text = prev && 'text' in prev ? (prev.text ?? '') : '';
     const ans: ExamAnswer =
       cur.type === 'choice'
         ? { kind: 'choice', letter }
-        : { kind: 'self', grade: grade ?? 'wrong', text: (document.getElementById('ex-proof') as HTMLTextAreaElement | null)?.value ?? '' };
-    setRun({ ...run, answers: { ...run.answers, [cur.id]: ans } });
+        : { kind: 'self', grade: grade ?? (prev?.kind === 'self' ? prev.grade : 'wrong'), text };
+    setAnswer(ans);
   }
 
   if (report) {
@@ -230,21 +229,25 @@ export function ExamPage() {
 
           {cur.type === 'fill' && (
             <input
-              id="ex-fill"
               className="fill-input"
-              defaultValue={saved && saved.kind === 'fill' ? saved.text : ''}
+              value={saved && saved.kind === 'fill' ? saved.text : ''}
               placeholder="输入答案"
-              onBlur={(e) => setRun({ ...run, answers: saveDraft(e.target.value) })}
+              onChange={(e) => setAnswer({ kind: 'fill', text: e.target.value })}
             />
           )}
 
           {cur.type === 'proof' && (
             <>
               <textarea
-                id="ex-proof"
-                defaultValue={saved && 'text' in saved ? saved.text ?? '' : ''}
+                value={textOf(cur.id)}
                 placeholder="写出解答"
-                onBlur={(e) => setRun({ ...run, answers: saveDraft(e.target.value) })}
+                onChange={(e) =>
+                  setAnswer({
+                    kind: 'self',
+                    grade: saved?.kind === 'self' ? saved.grade : 'wrong',
+                    text: e.target.value,
+                  })
+                }
               />
               <div className="actions">
                 <button
@@ -273,13 +276,12 @@ export function ExamPage() {
           )}
 
           <div className="actions">
-            <button className="btn" disabled={idx === 0} onClick={() => { setRun({ ...run, answers: saveDraft() }); setIdx(idx - 1); }}>
+            <button className="btn" disabled={idx === 0} onClick={() => setIdx(idx - 1)}>
               上一题
             </button>
             <button
               className="btn btn-pri"
               onClick={() => {
-                setRun({ ...run, answers: saveDraft() });
                 if (idx + 1 < list.length) setIdx(idx + 1);
                 else finish(false);
               }}

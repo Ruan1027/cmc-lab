@@ -25,6 +25,67 @@ function bump(bag: Bag, key: string, result: AnswerResult): void {
   else if (result === 'partial') b.correct += 0.5;
 }
 
+/** 统计快照：recordResult 与 recordResults 共用 */
+interface StatSlice {
+  stats: Stats;
+  history: HistoryEntry[];
+  wrongBook: Record<string, WrongEntry>;
+}
+
+/**
+ * 计算一次作答对统计与错题本的影响（纯函数，不写 store）。
+ * 跳过（skipped）不计入任何统计，返回 null。
+ */
+function applyResult(
+  s: StatSlice,
+  p: Problem,
+  result: AnswerResult,
+  userAnswer = '',
+  reason?: string,
+): StatSlice | null {
+  if (result === 'skipped') return null;
+
+  const stats: Stats = {
+    attempts: s.stats.attempts,
+    correct: s.stats.correct,
+    byKnowledge: { ...s.stats.byKnowledge },
+    byType: { ...s.stats.byType },
+    byDifficulty: { ...s.stats.byDifficulty },
+    bySource: { ...s.stats.bySource },
+  };
+  const wrongBook: Record<string, WrongEntry> = { ...s.wrongBook };
+
+  stats.attempts += 1;
+  if (result === 'correct') stats.correct += 1;
+  else if (result === 'partial') stats.correct += 0.5;
+
+  bump(stats.byType as Bag, p.type, result);
+  bump(stats.byDifficulty as Bag, String(p.difficulty), result);
+  bump(stats.bySource as Bag, sourceGroup(p.source), result);
+  (p.knowledge || []).forEach((k) => bump(stats.byKnowledge as Bag, k, result));
+
+  const history = [...s.history, { id: p.id, result, ts: Date.now(), ua: userAnswer }];
+
+  if (result === 'correct') {
+    if (wrongBook[p.id]) {
+      wrongBook[p.id] = { ...wrongBook[p.id], mastered: true, lastResult: result };
+    }
+  } else {
+    const prev = wrongBook[p.id] || { count: 0, lastWrong: 0, mastered: false, reasons: {} };
+    const reasons = { ...(prev.reasons || {}) };
+    if (reason) reasons[reason] = (reasons[reason] || 0) + 1;
+    wrongBook[p.id] = {
+      count: prev.count + 1,
+      lastWrong: Date.now(),
+      mastered: false,
+      lastResult: result,
+      reasons,
+    };
+  }
+
+  return { stats, history, wrongBook };
+}
+
 interface Session {
   queue: string[];
   idx: number;
@@ -38,6 +99,10 @@ interface Actions {
   hydrate: () => void;
   importMarkdown: (text: string) => { added: number; skipped: number; total: number };
   recordResult: (p: Problem, result: AnswerResult, userAnswer?: string, reason?: string) => void;
+  /** 整卷提交（模考交卷），只落盘一次 */
+  recordResults: (
+    entries: Array<{ p: Problem; result: AnswerResult; ua?: string; reason?: string }>,
+  ) => void;
   markMastered: (id: string, mastered: boolean) => void;
   toggleStar: (id: string) => void;
   updateSettings: (patch: Partial<Settings>) => void;
@@ -60,10 +125,10 @@ export interface AppState extends Omit<PersistedState, 'practice'> {
 }
 
 export const useAppStore = create<AppState & Actions>()((set, get) => {
-  /** 把当前持久字段落盘 */
+  /** 把当前持久字段落盘；失败时提示用户导出备份 */
   const persist = () => {
     const s = get();
-    saveState({
+    const ok = saveState({
       version: s.version,
       problems: s.problems,
       wrongBook: s.wrongBook,
@@ -79,6 +144,10 @@ export const useAppStore = create<AppState & Actions>()((set, get) => {
         setupHidden: s.session.setupHidden,
       } as PracticeSnapshot,
     });
+    if (!ok) {
+      get().notify('保存失败：浏览器存储空间可能已满，请到「题库」页导出备份');
+    }
+    return ok;
   };
 
   return {
@@ -117,69 +186,28 @@ export const useAppStore = create<AppState & Actions>()((set, get) => {
 
     importMarkdown: (text) => {
       const list = parseMarkdown(text);
-      const existing = get().problems;
+      // 用新数组而不是往 state.problems 里 push：
+      // 直接改原数组属于可变更新，Zustand 的浅比较可能判定「没变」而不触发渲染
+      const merged = get().problems.slice();
       let added = 0;
       let skipped = 0;
       list.forEach((p) => {
-        const dup = existing.find((x) => x.source === p.source && x.stem === p.stem);
+        const dup = merged.some((x) => x.source === p.source && x.stem === p.stem);
         if (dup) {
           skipped += 1;
           return;
         }
-        existing.push(p);
+        merged.push(p);
         added += 1;
       });
-      set({ problems: [...existing] });
+      set({ problems: merged });
       persist();
       return { added, skipped, total: list.length };
     },
 
     recordResult: (p, result, userAnswer = '', reason) => {
-      const s = get();
-      const stats: Stats = {
-        attempts: s.stats.attempts,
-        correct: s.stats.correct,
-        byKnowledge: { ...s.stats.byKnowledge },
-        byType: { ...s.stats.byType },
-        byDifficulty: { ...s.stats.byDifficulty },
-        bySource: { ...s.stats.bySource },
-      };
-      const wrongBook: Record<string, WrongEntry> = { ...s.wrongBook };
-
-      // 跳过不计入统计
-      if (result !== 'skipped') {
-        stats.attempts += 1;
-        if (result === 'correct') stats.correct += 1;
-        else if (result === 'partial') stats.correct += 0.5;
-
-        bump(stats.byType as Bag, p.type, result);
-        bump(stats.byDifficulty as Bag, String(p.difficulty), result);
-        bump(stats.bySource as Bag, sourceGroup(p.source), result);
-        (p.knowledge || []).forEach((k) => bump(stats.byKnowledge as Bag, k, result));
-
-        const entry: HistoryEntry = { id: p.id, result, ts: Date.now(), ua: userAnswer };
-        const history = [...s.history, entry];
-
-        if (result === 'correct') {
-          if (wrongBook[p.id]) {
-            wrongBook[p.id] = { ...wrongBook[p.id], mastered: true, lastResult: result };
-          }
-        } else {
-          const prev = wrongBook[p.id] || { count: 0, lastWrong: 0, mastered: false, reasons: {} };
-          const reasons = { ...(prev.reasons || {}) };
-          if (reason) reasons[reason] = (reasons[reason] || 0) + 1;
-          wrongBook[p.id] = {
-            count: prev.count + 1,
-            lastWrong: Date.now(),
-            mastered: false,
-            lastResult: result,
-            reasons,
-          };
-        }
-
-        set({ stats, history, wrongBook });
-      }
-
+      const applied = applyResult(get(), p, result, userAnswer, reason);
+      if (applied) set(applied);
       set({
         session: {
           ...get().session,
@@ -187,6 +215,29 @@ export const useAppStore = create<AppState & Actions>()((set, get) => {
         },
       });
       persist();
+    },
+
+    // 模考交卷时一次性提交整卷：逐题调用 recordResult 会写 10 次 localStorage，
+    // 每次都要把全量状态序列化一遍，没必要
+    recordResults: (entries) => {
+      let cur = get();
+      const marks = { ...cur.session.marks };
+      let dirty = false;
+      entries.forEach(({ p, result, ua = '', reason }) => {
+        const applied = applyResult(cur, p, result, ua, reason);
+        if (applied) {
+          cur = { ...cur, ...applied };
+          dirty = true;
+        }
+        marks[p.id] = result;
+      });
+      set({
+        stats: cur.stats,
+        history: cur.history,
+        wrongBook: cur.wrongBook,
+        session: { ...cur.session, marks },
+      });
+      if (dirty || entries.length) persist();
     },
 
     markMastered: (id, mastered) => {
