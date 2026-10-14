@@ -37,6 +37,7 @@ function classicScript(outDir = 'dist'): Plugin {
       }
 
       fs.writeFileSync(file, html, 'utf8');
+      // eslint-disable-next-line no-console
       console.log('[cmc] 单文件已降级为经典脚本（可 file:// 双击运行）');
     },
   };
