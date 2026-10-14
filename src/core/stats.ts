@@ -89,7 +89,10 @@ export function streakDays(history: HistoryEntry[]): number {
 }
 
 /** 近 n 天每天的做题数，用于打卡日历 */
-export function dailyCounts(history: HistoryEntry[], days = 56): Array<{ date: Date; count: number }> {
+export function dailyCounts(
+  history: HistoryEntry[],
+  days = 56,
+): Array<{ date: Date; count: number }> {
   const start = new Date();
   start.setHours(0, 0, 0, 0);
   start.setDate(start.getDate() - (days - 1));
@@ -108,7 +111,12 @@ export function dailyCounts(history: HistoryEntry[], days = 56): Array<{ date: D
 }
 
 /** 累计结果写入统计桶 */
-export function bumpBucket(stats: Stats, dimension: keyof Stats, key: string, result: string): void {
+export function bumpBucket(
+  stats: Stats,
+  dimension: keyof Stats,
+  key: string,
+  result: string,
+): void {
   const bag = stats[dimension] as unknown as Record<string, StatsBucket>;
   const b = (bag[key] ||= { attempts: 0, correct: 0 });
   b.attempts += 1;

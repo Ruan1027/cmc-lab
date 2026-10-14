@@ -24,9 +24,7 @@ export function FormulaPage() {
     })
       .map((g) => ({
         domain: g.domain,
-        items: kw
-          ? g.items.filter((it) => (it.name + it.tex).toLowerCase().includes(kw))
-          : g.items,
+        items: kw ? g.items.filter((it) => (it.name + it.tex).toLowerCase().includes(kw)) : g.items,
       }))
       .filter((g) => g.items.length > 0);
   }, [q, domain]);
@@ -47,7 +45,9 @@ export function FormulaPage() {
         <select value={domain} onChange={(e) => setDomain(e.target.value)}>
           <option value="">全部模块</option>
           {domains.map((d) => (
-            <option key={d} value={d}>{d}</option>
+            <option key={d} value={d}>
+              {d}
+            </option>
           ))}
         </select>
       </div>
@@ -67,7 +67,11 @@ export function FormulaPage() {
                 <div className="tex">
                   <Math tex={it.tex} display />
                 </div>
-                {it.note && <div className="meta" style={{ fontSize: 12, color: 'var(--sub)' }}>{it.note}</div>}
+                {it.note && (
+                  <div className="meta" style={{ fontSize: 12, color: 'var(--sub)' }}>
+                    {it.note}
+                  </div>
+                )}
               </div>
             ))}
           </div>

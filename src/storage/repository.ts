@@ -5,7 +5,15 @@
  * 抽象成接口是为了后续平滑替换到 IndexedDB（题库与作答记录增长后
  * localStorage 的 5MB 上限会成为瓶颈），届时只需换一个实现，上层不动。
  */
-import type { ExamGroup, ExamRecord, HistoryEntry, Problem, Settings, Stats, WrongEntry } from '../types';
+import type {
+  ExamGroup,
+  ExamRecord,
+  HistoryEntry,
+  Problem,
+  Settings,
+  Stats,
+  WrongEntry,
+} from '../types';
 import { DEFAULT_SETTINGS } from './defaults';
 import { GROUP_OPTIONS } from '../core/groups';
 

@@ -46,7 +46,10 @@ export function NewsPage() {
               <b>{n.title}</b>
               <span
                 className="pill"
-                style={{ background: CATEGORY_COLOR[n.category] + '1a', color: CATEGORY_COLOR[n.category] }}
+                style={{
+                  background: CATEGORY_COLOR[n.category] + '1a',
+                  color: CATEGORY_COLOR[n.category],
+                }}
               >
                 {n.category}
               </span>

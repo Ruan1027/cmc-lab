@@ -4,12 +4,12 @@
 
 ## 1. GitHub（✅ 已完成）
 
-| 项 | 值 |
-| --- | --- |
-| 仓库 | https://github.com/Ruan1027/cmc-lab |
-| 可见性 | public |
-| 默认分支 | `master` |
-| 本地 remote 名 | `github` |
+| 项               | 值                                        |
+| ---------------- | ----------------------------------------- |
+| 仓库             | https://github.com/Ruan1027/cmc-lab       |
+| 可见性           | public                                    |
+| 默认分支         | `master`                                  |
+| 本地 remote 名   | `github`                                  |
 | 当前 remote 地址 | `git@ssh.github.com:Ruan1027/cmc-lab.git` |
 
 本地推送方式（按网络环境二选一）：
@@ -119,13 +119,13 @@ Gitee 账号需完成实名认证才能正常使用。
 
 ## 4. 注意事项
 
-| 事项 | 说明 |
-| --- | --- |
-| 分支保护 | 两端都建议保护 `master`，要求 PR + CI 通过 |
-| CI | GitHub Actions 已配好（`.github/workflows/ci.yml`）；Gitee 的 Gitee Go 需另行开通 |
-| Issue 模板 | 两端共用 `.github/ISSUE_TEMPLATE/`（Gitee 兼容该目录） |
-| 仓库描述 | Gitee 上建议加中文简介与标签，利于站内搜索 |
-| 许可证 | `LICENSE` 已放在根目录，两端都能识别 |
+| 事项       | 说明                                                                              |
+| ---------- | --------------------------------------------------------------------------------- |
+| 分支保护   | 两端都建议保护 `master`，要求 PR + CI 通过                                        |
+| CI         | GitHub Actions 已配好（`.github/workflows/ci.yml`）；Gitee 的 Gitee Go 需另行开通 |
+| Issue 模板 | 两端共用 `.github/ISSUE_TEMPLATE/`（Gitee 兼容该目录）                            |
+| 仓库描述   | Gitee 上建议加中文简介与标签，利于站内搜索                                        |
+| 许可证     | `LICENSE` 已放在根目录，两端都能识别                                              |
 
 ## 5. 提升 Star 的小建议
 

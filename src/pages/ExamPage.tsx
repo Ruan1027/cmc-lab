@@ -38,7 +38,10 @@ export function ExamPage() {
       (groups[g] ||= []).push(p);
     });
     return Object.keys(groups)
-      .sort((a, b) => (parseInt(b.replace(/\D/g, ''), 10) || 0) - (parseInt(a.replace(/\D/g, ''), 10) || 0))
+      .sort(
+        (a, b) =>
+          (parseInt(b.replace(/\D/g, ''), 10) || 0) - (parseInt(a.replace(/\D/g, ''), 10) || 0),
+      )
       .map((k) => ({ name: k, list: groups[k] }));
   }, [problems]);
 
@@ -47,7 +50,12 @@ export function ExamPage() {
   const [run, setRun] = useState<Running | null>(null);
   const [idx, setIdx] = useState(0);
   const [now, setNow] = useState(Date.now());
-  const [report, setReport] = useState<{ paper: string; used: number; auto: boolean; res: ReturnType<typeof gradeExam> } | null>(null);
+  const [report, setReport] = useState<{
+    paper: string;
+    used: number;
+    auto: boolean;
+    res: ReturnType<typeof gradeExam>;
+  } | null>(null);
   const timer = useRef<number | null>(null);
 
   useEffect(() => {
@@ -161,18 +169,46 @@ export function ExamPage() {
       <div className="card">
         <h2>📋 模考报告 · {report.paper}</h2>
         <div className="stat-grid">
-          <div className="stat-box"><div className="stat-num">{Math.round(res.score)}</div><div className="stat-label">得分 / {Math.round(res.total)}</div></div>
-          <div className="stat-box"><div className="stat-num">{pct}%</div><div className="stat-label">得分率</div></div>
-          <div className="stat-box"><div className="stat-num">{report.used}</div><div className="stat-label">用时（分钟）</div></div>
-          <div className="stat-box"><div className="stat-num">{res.right}</div><div className="stat-label">完全正确</div></div>
-          <div className="stat-box"><div className="stat-num">{res.partial}</div><div className="stat-label">部分正确</div></div>
-          <div className="stat-box"><div className="stat-num">{res.wrong}</div><div className="stat-label">错误/未答</div></div>
+          <div className="stat-box">
+            <div className="stat-num">{Math.round(res.score)}</div>
+            <div className="stat-label">得分 / {Math.round(res.total)}</div>
+          </div>
+          <div className="stat-box">
+            <div className="stat-num">{pct}%</div>
+            <div className="stat-label">得分率</div>
+          </div>
+          <div className="stat-box">
+            <div className="stat-num">{report.used}</div>
+            <div className="stat-label">用时（分钟）</div>
+          </div>
+          <div className="stat-box">
+            <div className="stat-num">{res.right}</div>
+            <div className="stat-label">完全正确</div>
+          </div>
+          <div className="stat-box">
+            <div className="stat-num">{res.partial}</div>
+            <div className="stat-label">部分正确</div>
+          </div>
+          <div className="stat-box">
+            <div className="stat-num">{res.wrong}</div>
+            <div className="stat-label">错误/未答</div>
+          </div>
         </div>
-        {report.auto && <div className="result err"><div className="result-title err">⏰ 时间到，已自动交卷</div></div>}
+        {report.auto && (
+          <div className="result err">
+            <div className="result-title err">⏰ 时间到，已自动交卷</div>
+          </div>
+        )}
         {loss.length > 0 && (
           <>
             <h3 style={{ marginTop: 14 }}>失分集中在</h3>
-            <div>{loss.slice(0, 8).map((l) => <span className="tag" key={l.k}>{l.k} ×{l.n}</span>)}</div>
+            <div>
+              {loss.slice(0, 8).map((l) => (
+                <span className="tag" key={l.k}>
+                  {l.k} ×{l.n}
+                </span>
+              ))}
+            </div>
           </>
         )}
         <h3 style={{ marginTop: 16 }}>逐题回顾</h3>
@@ -182,11 +218,15 @@ export function ExamPage() {
               {d.result === 'correct' ? '✅' : d.result === 'partial' ? '🟡' : '❌'} {d.source}
               <span style={{ fontSize: 12, color: 'var(--sub)' }}> · {d.sc} 分</span>
             </div>
-            <button className="btn" onClick={() => review([d.id])}>查看解析</button>
+            <button className="btn" onClick={() => review([d.id])}>
+              查看解析
+            </button>
           </div>
         ))}
         <div className="actions">
-          <button className="btn btn-pri" onClick={() => setReport(null)}>再来一套</button>
+          <button className="btn btn-pri" onClick={() => setReport(null)}>
+            再来一套
+          </button>
         </div>
       </div>
     );
@@ -198,20 +238,26 @@ export function ExamPage() {
     return (
       <>
         <div className="exam-bar">
-          <div>第 {idx + 1} / {list.length} 题 · {cur.source}</div>
+          <div>
+            第 {idx + 1} / {list.length} 题 · {cur.source}
+          </div>
           <div>
             剩余{' '}
             <span className={'exam-clock' + (remain <= 0 ? ' over' : remain <= 300 ? ' warn' : '')}>
               {clock(remain)}
             </span>
           </div>
-          <button className="btn btn-err" onClick={() => finish(false)}>交卷</button>
+          <button className="btn btn-err" onClick={() => finish(false)}>
+            交卷
+          </button>
         </div>
         <div className="card">
           <span className="stem-label">
             {cur.type === 'choice' ? '选择题' : cur.type === 'fill' ? '填空题' : '解答题'}
           </span>
-          <div className="stem"><RichText text={cur.stem} /></div>
+          <div className="stem">
+            <RichText text={cur.stem} />
+          </div>
 
           {cur.type === 'choice' && (
             <div className="options">
@@ -219,7 +265,11 @@ export function ExamPage() {
                 const letter = String.fromCharCode(65 + i);
                 const on = saved && saved.kind === 'choice' && saved.letter === letter;
                 return (
-                  <div key={i} className={'option' + (on ? ' selected' : '')} onClick={() => pick(letter)}>
+                  <div
+                    key={i}
+                    className={'option' + (on ? ' selected' : '')}
+                    onClick={() => pick(letter)}
+                  >
                     <b>{letter}.</b> <RichText text={opt.replace(/^[A-D][.、]\s*/, '')} />
                   </div>
                 );
@@ -252,21 +302,33 @@ export function ExamPage() {
               <div className="actions">
                 <button
                   className="btn"
-                  style={saved?.kind === 'self' && saved.grade === 'correct' ? { outline: '2px solid var(--ok)' } : undefined}
+                  style={
+                    saved?.kind === 'self' && saved.grade === 'correct'
+                      ? { outline: '2px solid var(--ok)' }
+                      : undefined
+                  }
                   onClick={() => pick('', 'correct')}
                 >
                   完全会做
                 </button>
                 <button
                   className="btn"
-                  style={saved?.kind === 'self' && saved.grade === 'partial' ? { outline: '2px solid var(--warn)' } : undefined}
+                  style={
+                    saved?.kind === 'self' && saved.grade === 'partial'
+                      ? { outline: '2px solid var(--warn)' }
+                      : undefined
+                  }
                   onClick={() => pick('', 'partial')}
                 >
                   部分会做
                 </button>
                 <button
                   className="btn"
-                  style={saved?.kind === 'self' && saved.grade === 'wrong' ? { outline: '2px solid var(--err)' } : undefined}
+                  style={
+                    saved?.kind === 'self' && saved.grade === 'wrong'
+                      ? { outline: '2px solid var(--err)' }
+                      : undefined
+                  }
                   onClick={() => pick('', 'wrong')}
                 >
                   不会
@@ -306,15 +368,21 @@ export function ExamPage() {
         <div className="row">
           <select value={paper} onChange={(e) => setPaper(e.target.value)}>
             {papers.map((p) => (
-              <option key={p.name} value={p.name}>{p.name}（{p.list.length} 题）</option>
+              <option key={p.name} value={p.name}>
+                {p.name}（{p.list.length} 题）
+              </option>
             ))}
           </select>
           <select value={minutes} onChange={(e) => setMinutes(Number(e.target.value))}>
             {[60, 90, 120, 150].map((m) => (
-              <option key={m} value={m}>{m} 分钟</option>
+              <option key={m} value={m}>
+                {m} 分钟
+              </option>
             ))}
           </select>
-          <button className="btn btn-pri" onClick={start}>开始模考</button>
+          <button className="btn btn-pri" onClick={start}>
+            开始模考
+          </button>
         </div>
       </div>
 
@@ -323,24 +391,29 @@ export function ExamPage() {
         {exams.length === 0 ? (
           <div className="empty">还没有模考记录</div>
         ) : (
-          [...exams].reverse().slice(0, 10).map((e, i) => {
-            const pct = e.total ? Math.round((e.score / e.total) * 100) : 0;
-            return (
-              <div className="item" key={i}>
-                <div>
-                  <b>{e.source}</b>
-                  <div className="meta">
-                    {new Date(e.ts).toLocaleString('zh-CN')} · 用时 {e.used} 分钟
-                    {e.auto ? ' · 超时自动交卷' : ''}
+          [...exams]
+            .reverse()
+            .slice(0, 10)
+            .map((e, i) => {
+              const pct = e.total ? Math.round((e.score / e.total) * 100) : 0;
+              return (
+                <div className="item" key={i}>
+                  <div>
+                    <b>{e.source}</b>
+                    <div className="meta">
+                      {new Date(e.ts).toLocaleString('zh-CN')} · 用时 {e.used} 分钟
+                      {e.auto ? ' · 超时自动交卷' : ''}
+                    </div>
+                  </div>
+                  <div>
+                    <b>
+                      {Math.round(e.score)} / {Math.round(e.total)}
+                    </b>{' '}
+                    <span className={'pill ' + (pct >= 60 ? 'pill-ok' : 'pill-weak')}>{pct}%</span>
                   </div>
                 </div>
-                <div>
-                  <b>{Math.round(e.score)} / {Math.round(e.total)}</b>{' '}
-                  <span className={'pill ' + (pct >= 60 ? 'pill-ok' : 'pill-weak')}>{pct}%</span>
-                </div>
-              </div>
-            );
-          })
+              );
+            })
         )}
       </div>
     </>

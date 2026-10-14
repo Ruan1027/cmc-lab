@@ -43,9 +43,7 @@ setTimeout(() => {
     ' * 迁移自旧版应用，覆盖 12 个模块。渲染走 KaTeX，离线可用。',
     ' */',
     '',
-    'export const FORMULA_BOOK: FormulaGroup[] = ' +
-      JSON.stringify(formulas, null, 2) +
-      ';',
+    'export const FORMULA_BOOK: FormulaGroup[] = ' + JSON.stringify(formulas, null, 2) + ';',
     '',
     'export const FORMULA_COUNT = FORMULA_BOOK.reduce((s, g) => s + g.items.length, 0);',
     '',
@@ -53,5 +51,10 @@ setTimeout(() => {
   fs.writeFileSync(path.join(outDir, 'formulas.ts'), formulaSrc, 'utf8');
 
   console.log('易错点域数:', Object.keys(pitfalls).length);
-  console.log('公式分组:', formulas.length, '总条数:', formulas.reduce((s, g) => s + g.items.length, 0));
+  console.log(
+    '公式分组:',
+    formulas.length,
+    '总条数:',
+    formulas.reduce((s, g) => s + g.items.length, 0),
+  );
 }, 200);

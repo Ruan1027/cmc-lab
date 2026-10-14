@@ -14,17 +14,43 @@
 
 /** LaTeX 命令 → 统一短名 */
 const FN_MAP: ReadonlyArray<readonly [string, string]> = [
-  ['\\arcsin', 'asin'], ['\\arccos', 'acos'], ['\\arctan', 'atan'],
-  ['\\sin', 'sin'], ['\\cos', 'cos'], ['\\tan', 'tan'],
-  ['\\ln', 'ln'], ['\\log', 'log'], ['\\lg', 'log'],
-  ['\\sqrt', 'sqrt'], ['\\abs', 'abs'], ['\\pi', 'pi'], ['\\cbrt', 'cbrt'],
+  ['\\arcsin', 'asin'],
+  ['\\arccos', 'acos'],
+  ['\\arctan', 'atan'],
+  ['\\sin', 'sin'],
+  ['\\cos', 'cos'],
+  ['\\tan', 'tan'],
+  ['\\ln', 'ln'],
+  ['\\log', 'log'],
+  ['\\lg', 'log'],
+  ['\\sqrt', 'sqrt'],
+  ['\\abs', 'abs'],
+  ['\\pi', 'pi'],
+  ['\\cbrt', 'cbrt'],
 ];
 
 /** 归一化后的函数短名，按长度降序，保证 arcsin 先于 sin 匹配 */
 const FN_SHORT: ReadonlyArray<readonly [string, string]> = [
-  'arcsin', 'arccos', 'arctan', 'sqrt', 'cbrt', 'sin', 'cos', 'tan', 'ln', 'log', 'abs', 'pi',
+  'arcsin',
+  'arccos',
+  'arctan',
+  'sqrt',
+  'cbrt',
+  'sin',
+  'cos',
+  'tan',
+  'ln',
+  'log',
+  'abs',
+  'pi',
 ]
-  .map((n) => [n, ({ arcsin: 'asin', arccos: 'acos', arctan: 'atan' } as Record<string, string>)[n] || n] as [string, string])
+  .map(
+    (n) =>
+      [
+        n,
+        ({ arcsin: 'asin', arccos: 'acos', arctan: 'atan' } as Record<string, string>)[n] || n,
+      ] as [string, string],
+  )
   .sort((a, b) => b[0].length - a[0].length);
 
 /**
@@ -34,7 +60,9 @@ const FN_SHORT: ReadonlyArray<readonly [string, string]> = [
  */
 export function normalizeExpr(s: string | null | undefined): string {
   if (s == null) return '';
-  let str = String(s).trim().replace(/^\$+|\$+$/g, '');
+  let str = String(s)
+    .trim()
+    .replace(/^\$+|\$+$/g, '');
 
   // ---- 1. Unicode 符号 → ASCII ----
   str = str
@@ -60,11 +88,17 @@ export function normalizeExpr(s: string | null | undefined): string {
   const ARG = '((?:[^{}]|\\{[^{}]*\\})*)';
   do {
     prev = str;
-    str = str.replace(new RegExp('\\\\[dt]?frac\\s*\\{' + ARG + '\\}\\s*\\{' + ARG + '\\}', 'g'), '($1)/($2)');
+    str = str.replace(
+      new RegExp('\\\\[dt]?frac\\s*\\{' + ARG + '\\}\\s*\\{' + ARG + '\\}', 'g'),
+      '($1)/($2)',
+    );
   } while (str !== prev);
   do {
     prev = str;
-    str = str.replace(new RegExp('\\\\sqrt\\s*\\[\\s*(\\d+)\\s*\\]\\s*\\{' + ARG + '\\}', 'g'), 'root($1,$2)');
+    str = str.replace(
+      new RegExp('\\\\sqrt\\s*\\[\\s*(\\d+)\\s*\\]\\s*\\{' + ARG + '\\}', 'g'),
+      'root($1,$2)',
+    );
   } while (str !== prev);
   do {
     prev = str;
@@ -129,7 +163,9 @@ export function normalizeExpr(s: string | null | undefined): string {
     // 刚输出的是函数短名（后面紧跟 '('），此时不应补乘号
     const prevIsFn = FN_SHORT.some((pair) => out.endsWith(pair[1]));
     if (
-      out && !prevIsFn && prevCh !== '*' &&
+      out &&
+      !prevIsFn &&
+      prevCh !== '*' &&
       (isDigit(prevCh) || isAlpha(prevCh) || prevCh === ')' || prevCh === ']')
     ) {
       if (isAlpha(ch) || ch === '(') out += '*';
@@ -149,7 +185,8 @@ export function normalizeExpr(s: string | null | undefined): string {
   // \frac{\sqrt{3}}{2} 展开成 (sqrt(3))/(2)，而手写答案常是 sqrt(3)/2，
   // 不剥括号的话两者字符串对不上，只能靠数值比较兜底（含变量时兜不住）。
   // 括号前若是字母（sqrt(3) 的 3）或括号内带运算符（(x+1)）都不动。
-  const ATOM = '(?:sqrt|cbrt|abs|ln|log|sin|cos|tan|arcsin|arccos|arctan)\\([^()]*\\)|[a-z]\\d*|\\d+(?:\\.\\d+)?';
+  const ATOM =
+    '(?:sqrt|cbrt|abs|ln|log|sin|cos|tan|arcsin|arccos|arctan)\\([^()]*\\)|[a-z]\\d*|\\d+(?:\\.\\d+)?';
   let prevParen = '';
   do {
     prevParen = str;
@@ -192,7 +229,10 @@ export function tryEval(s: string): number | null {
   js = js.replace(/\bcos\(/g, 'Math.cos(');
   js = js.replace(/\btan\(/g, 'Math.tan(');
 
-  const DANGER = new RegExp("[;=\\[\\]{}'\"\\x60]|=>|function|eval|window|document|this|constructor|import|require|process", 'i');
+  const DANGER = new RegExp(
+    '[;=\\[\\]{}\'"\\x60]|=>|function|eval|window|document|this|constructor|import|require|process',
+    'i',
+  );
   if (DANGER.test(js)) return null;
   if (!/^[-+*/().,0-9a-zA-Z_*]*$/.test(js)) return null;
 

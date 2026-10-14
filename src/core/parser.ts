@@ -24,18 +24,29 @@ import { uid } from '../utils/id';
 
 /** 中文字段名 → 数据字段名（允许同义写法） */
 export const FIELD_MAP: Record<string, string> = {
-  类型: 'type', 题型: 'type',
-  知识点: 'knowledge', 考点: 'knowledge',
+  类型: 'type',
+  题型: 'type',
+  知识点: 'knowledge',
+  考点: 'knowledge',
   难度: 'difficulty',
   分值: 'score',
-  题目: 'stem', 题干: 'stem',
+  题目: 'stem',
+  题干: 'stem',
   选项: 'options',
-  答案: 'answer', 正确答案: 'answer',
-  备选: 'answerAlt', 备选答案: 'answerAlt', 其他答案: 'answerAlt',
-  解析: 'solution', 详解: 'solution',
-  思路: 'hint', 解题思路: 'hint',
-  易错点: 'pitfall', 易错: 'pitfall', 注意: 'pitfall',
-  组别: 'group', 参赛组别: 'group',
+  答案: 'answer',
+  正确答案: 'answer',
+  备选: 'answerAlt',
+  备选答案: 'answerAlt',
+  其他答案: 'answerAlt',
+  解析: 'solution',
+  详解: 'solution',
+  思路: 'hint',
+  解题思路: 'hint',
+  易错点: 'pitfall',
+  易错: 'pitfall',
+  注意: 'pitfall',
+  组别: 'group',
+  参赛组别: 'group',
   来源: 'source',
 };
 
@@ -89,7 +100,10 @@ export function parseMarkdown(text: string): Problem[] {
         else p.type = 'fill' as ProblemType;
       } else if (key === 'knowledge') {
         p.knowledge = normKnowledgeList(
-          val.split(/[,，、]/).map((s) => s.trim()).filter(Boolean),
+          val
+            .split(/[,，、]/)
+            .map((s) => s.trim())
+            .filter(Boolean),
         );
       } else if (key === 'difficulty') {
         const n = parseInt(val, 10);
@@ -98,9 +112,15 @@ export function parseMarkdown(text: string): Problem[] {
         const n = parseFloat(val.replace(/[^\d.]/g, ''));
         if (n > 0) p.score = n;
       } else if (key === 'options') {
-        p.options = val.split('|').map((s) => s.trim()).filter(Boolean);
+        p.options = val
+          .split('|')
+          .map((s) => s.trim())
+          .filter(Boolean);
       } else if (key === 'answerAlt') {
-        p.answerAlt = val.split(/[,，]/).map((s) => s.trim()).filter(Boolean);
+        p.answerAlt = val
+          .split(/[,，]/)
+          .map((s) => s.trim())
+          .filter(Boolean);
       } else if (key) {
         (p as unknown as Record<string, unknown>)[key] = val;
       }

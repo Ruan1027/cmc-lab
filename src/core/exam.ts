@@ -54,7 +54,10 @@ export function gradeExam(problems: Problem[], answers: Record<string, ExamAnswe
     if (!a) {
       blank += 1;
     } else if (a.kind === 'choice') {
-      const correctLetter = String(p.answer || '').trim().charAt(0).toUpperCase();
+      const correctLetter = String(p.answer || '')
+        .trim()
+        .charAt(0)
+        .toUpperCase();
       result = a.letter === correctLetter ? 'correct' : 'wrong';
     } else if (a.kind === 'fill') {
       result = answerMatch(a.text, p.answer, p.answerAlt) ? 'correct' : 'wrong';

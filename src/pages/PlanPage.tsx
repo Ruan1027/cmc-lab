@@ -42,7 +42,9 @@ export function PlanPage() {
               onChange={(e) => updateSettings({ group: e.target.value as ExamGroup })}
             >
               {GROUP_OPTIONS.map((o) => (
-                <option key={o.value} value={o.value}>{o.label}</option>
+                <option key={o.value} value={o.value}>
+                  {o.label}
+                </option>
               ))}
             </select>
           </label>
@@ -76,8 +78,8 @@ export function PlanPage() {
           </label>
         </div>
         <div className="hint" style={{ marginTop: 12 }}>
-          <b>组别说明</b>：2022 年及以前只有「非数学类」一卷，A/B 类考生都考它；2023 年起才分 A、B 卷。
-          所以报非数学 A 类时，练习范围 = A 类卷 + 往年非数学类旧卷。
+          <b>组别说明</b>：2022 年及以前只有「非数学类」一卷，A/B 类考生都考它；2023 年起才分 A、B
+          卷。 所以报非数学 A 类时，练习范围 = A 类卷 + 往年非数学类旧卷。
         </div>
       </div>
 
@@ -105,7 +107,9 @@ export function PlanPage() {
               <div className="stat-label">已做</div>
             </div>
             <div className="stat-box">
-              <div className="stat-num">{pool.length ? Math.round((done / pool.length) * 100) : 0}%</div>
+              <div className="stat-num">
+                {pool.length ? Math.round((done / pool.length) * 100) : 0}%
+              </div>
               <div className="stat-label">覆盖率</div>
             </div>
             <div className="stat-box">
@@ -122,7 +126,9 @@ export function PlanPage() {
           <div className="hint">
             还剩 <b>{pool.length - done}</b> 题没做，按剩余 <b>{left}</b> 天算，每天需完成约{' '}
             <b>{plan.perDay}</b> 题；你的每日目标是 <b>{settings.dailyGoal}</b> 题
-            {plan.perDay > settings.dailyGoal ? '，目标偏低，建议调高或优先刷薄弱点。' : '，进度安排合理。'}
+            {plan.perDay > settings.dailyGoal
+              ? '，目标偏低，建议调高或优先刷薄弱点。'
+              : '，进度安排合理。'}
           </div>
         )}
         <div className="footer-note" style={{ textAlign: 'left' }}>
@@ -142,15 +148,22 @@ export function PlanPage() {
             const cov = m.total ? Math.round((m.done / m.total) * 100) : 0;
             const rt = m.attempts ? Math.round((m.correct / m.attempts) * 100) : null;
             const pill =
-              rt === null ? <span className="pill pill-idle">未练</span>
-                : rt < 60 ? <span className="pill pill-weak">{rt}%</span>
-                  : rt < 85 ? <span className="pill pill-mid">{rt}%</span>
-                    : <span className="pill pill-ok">{rt}%</span>;
+              rt === null ? (
+                <span className="pill pill-idle">未练</span>
+              ) : rt < 60 ? (
+                <span className="pill pill-weak">{rt}%</span>
+              ) : rt < 85 ? (
+                <span className="pill pill-mid">{rt}%</span>
+              ) : (
+                <span className="pill pill-ok">{rt}%</span>
+              );
             return (
               <div className="bar-row" key={m.domain}>
                 <div className="bar-head">
                   <span>{m.domain}</span>
-                  <span>{m.done}/{m.total} · 覆盖 {cov}% {pill}</span>
+                  <span>
+                    {m.done}/{m.total} · 覆盖 {cov}% {pill}
+                  </span>
                 </div>
                 <div className="bar-bg">
                   <div className="bar-fill" style={{ width: `${cov}%` }} />
@@ -190,7 +203,11 @@ export function PlanPage() {
           {calendar.map((d, i) => {
             const isToday = d.date.toDateString() === new Date().toDateString();
             return (
-              <div key={i} className={(d.count ? 'on ' : '') + (isToday ? 'today' : '')} title={`${d.date.getMonth() + 1}/${d.date.getDate()}`}>
+              <div
+                key={i}
+                className={(d.count ? 'on ' : '') + (isToday ? 'today' : '')}
+                title={`${d.date.getMonth() + 1}/${d.date.getDate()}`}
+              >
                 {d.date.getDate()}
               </div>
             );

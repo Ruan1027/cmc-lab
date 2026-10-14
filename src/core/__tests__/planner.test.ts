@@ -11,9 +11,20 @@ function statsOf(): Stats {
 
 function prob(id: string, knowledge: string[]): Problem {
   return {
-    id, source: `2024 第十六届CMC预赛 非数学A类 填空1 ${id}`, type: 'fill',
-    knowledge, difficulty: 3, score: null, group: '', hint: '', pitfall: '',
-    stem: 'x', options: [], answer: '1', answerAlt: [], solution: 's',
+    id,
+    source: `2024 第十六届CMC预赛 非数学A类 填空1 ${id}`,
+    type: 'fill',
+    knowledge,
+    difficulty: 3,
+    score: null,
+    group: '',
+    hint: '',
+    pitfall: '',
+    stem: 'x',
+    options: [],
+    answer: '1',
+    answerAlt: [],
+    solution: 's',
   };
 }
 
@@ -40,7 +51,9 @@ describe('buildTodayPlan', () => {
 
   it('错题优先出现在任务最前', () => {
     const plan = buildTodayPlan(
-      problems, statsOf(), [],
+      problems,
+      statsOf(),
+      [],
       { '3': { count: 1, lastWrong: Date.now(), mastered: false } },
       { ...DEFAULT_SETTINGS, dailyGoal: 3 },
     );
@@ -50,7 +63,9 @@ describe('buildTodayPlan', () => {
 
   it('已掌握错题不再享受「错题优先」，但仍会作为未做题出现', () => {
     const plan = buildTodayPlan(
-      problems, statsOf(), [],
+      problems,
+      statsOf(),
+      [],
       { '3': { count: 1, lastWrong: Date.now(), mastered: true } },
       { ...DEFAULT_SETTINGS, dailyGoal: 3 },
     );

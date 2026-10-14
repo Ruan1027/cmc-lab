@@ -1,0 +1,10 @@
+# 统一行尾为 LF： prettier 配置为 endOfLine=lf，
+# 若不加这条，Windows 上 git 按 autocrlf 检出 CRLF 会让格式检查永远不过
+* text=auto eol=lf
+
+# 二进制文件不做行尾转换
+*.png binary
+*.jpg binary
+*.ico binary
+*.woff binary
+*.woff2 binary

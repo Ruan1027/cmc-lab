@@ -55,7 +55,13 @@ export function App() {
         </nav>
       </div>
 
-      {hydrated ? <Current /> : <div className="card"><div className="empty">加载中…</div></div>}
+      {hydrated ? (
+        <Current />
+      ) : (
+        <div className="card">
+          <div className="empty">加载中…</div>
+        </div>
+      )}
 
       <nav className="tabbar">
         <div className="tabbar-inner">

@@ -61,14 +61,21 @@ export function buildTodayPlan(
     const ids = weakPool.slice(0, take).map((p) => p.id);
     if (ids.length) {
       ids.forEach((i) => used.add(i));
-      tasks.push({ label: `薄弱知识点新题 ${ids.length} 道`, ids, why: '优先补正确率低于 60% 的知识点' });
+      tasks.push({
+        label: `薄弱知识点新题 ${ids.length} 道`,
+        ids,
+        why: '优先补正确率低于 60% 的知识点',
+      });
     }
   }
 
   // 3) 其余按顺序推进
   const restNeed = Math.max(0, goal - tasks.reduce((s, t) => s + t.ids.length, 0));
   if (restNeed > 0) {
-    const rest = undone.filter((p) => !used.has(p.id)).slice(0, restNeed).map((p) => p.id);
+    const rest = undone
+      .filter((p) => !used.has(p.id))
+      .slice(0, restNeed)
+      .map((p) => p.id);
     if (rest.length) {
       tasks.push({ label: `新题 ${rest.length} 道`, ids: rest, why: '按题库顺序推进，扩大覆盖面' });
     }

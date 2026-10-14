@@ -42,9 +42,7 @@ export function PracticePage() {
           <button
             className="btn"
             onClick={() =>
-              startSession(
-                [...problems].sort(() => Math.random() - 0.5).map((p) => p.id),
-              )
+              startSession([...problems].sort(() => Math.random() - 0.5).map((p) => p.id))
             }
           >
             随机练习
@@ -74,7 +72,15 @@ export function PracticePage() {
     }
     setResult(r);
     setSubmitted(true);
-    recordResult(current, r, current.type === 'fill' ? fill : current.type === 'choice' ? String.fromCharCode(65 + (picked ?? 0)) : proof);
+    recordResult(
+      current,
+      r,
+      current.type === 'fill'
+        ? fill
+        : current.type === 'choice'
+          ? String.fromCharCode(65 + (picked ?? 0))
+          : proof,
+    );
   };
 
   const selfGrade = (grade: AnswerResult) => {
@@ -108,11 +114,17 @@ export function PracticePage() {
     <>
       <div className="card">
         <div className="progress">
-          <span>第 {session.idx + 1} / {total} 题</span>
+          <span>
+            第 {session.idx + 1} / {total} 题
+          </span>
           <div className="progress-bar">
             <div style={{ width: `${(session.idx / total) * 100}%` }} />
           </div>
-          <button className="btn" style={{ padding: '4px 10px', minHeight: 28 }} onClick={endSession}>
+          <button
+            className="btn"
+            style={{ padding: '4px 10px', minHeight: 28 }}
+            onClick={endSession}
+          >
             结束本轮
           </button>
         </div>
@@ -135,7 +147,8 @@ export function PracticePage() {
 
         <span className="stem-label">
           {current.type === 'choice' ? '选择题' : current.type === 'fill' ? '填空题' : '解答题'}
-          {' · 难度 '}{current.difficulty}/5
+          {' · 难度 '}
+          {current.difficulty}/5
           {current.score ? ` · ${current.score} 分` : ''}
         </span>
         <div className="stem">
@@ -143,7 +156,9 @@ export function PracticePage() {
         </div>
         <div>
           {current.knowledge.map((k) => (
-            <span className="tag" key={k}>{k}</span>
+            <span className="tag" key={k}>
+              {k}
+            </span>
           ))}
         </div>
         <div style={{ marginTop: 8, fontSize: 12, color: 'var(--sub)' }}>
@@ -165,13 +180,13 @@ export function PracticePage() {
               const letter = String.fromCharCode(65 + i);
               let cls = 'option';
               if (submitted) {
-                if (letter === String(current.answer).trim().charAt(0).toUpperCase()) cls += ' correct';
+                if (letter === String(current.answer).trim().charAt(0).toUpperCase())
+                  cls += ' correct';
                 else if (picked === i) cls += ' wrong';
               } else if (picked === i) cls += ' selected';
               return (
                 <div key={i} className={cls} onClick={() => !submitted && setPicked(i)}>
-                  <b>{letter}.</b>{' '}
-                  <RichText text={opt.replace(/^[A-D][.、]\s*/, '')} />
+                  <b>{letter}.</b> <RichText text={opt.replace(/^[A-D][.、]\s*/, '')} />
                 </div>
               );
             })}
@@ -201,18 +216,30 @@ export function PracticePage() {
             />
             {!submitted && (
               <div className="actions">
-                <button className="btn btn-ok" onClick={() => selfGrade('correct')}>✅ 完全正确</button>
-                <button className="btn" onClick={() => selfGrade('partial')}>🟡 部分正确</button>
-                <button className="btn btn-err" onClick={() => selfGrade('wrong')}>❌ 错误</button>
+                <button className="btn btn-ok" onClick={() => selfGrade('correct')}>
+                  ✅ 完全正确
+                </button>
+                <button className="btn" onClick={() => selfGrade('partial')}>
+                  🟡 部分正确
+                </button>
+                <button className="btn btn-err" onClick={() => selfGrade('wrong')}>
+                  ❌ 错误
+                </button>
               </div>
             )}
           </>
         )}
 
         {submitted && result && (
-          <div className={`result ${result === 'correct' ? 'ok' : result === 'partial' ? 'partial' : 'err'}`}>
+          <div
+            className={`result ${result === 'correct' ? 'ok' : result === 'partial' ? 'partial' : 'err'}`}
+          >
             <div className="result-title">
-              {result === 'correct' ? '✅ 回答正确' : result === 'partial' ? '🟡 部分正确' : '❌ 回答错误'}
+              {result === 'correct'
+                ? '✅ 回答正确'
+                : result === 'partial'
+                  ? '🟡 部分正确'
+                  : '❌ 回答错误'}
             </div>
             <div className="answer-block">
               <div className="label">正确答案</div>

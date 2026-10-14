@@ -1,0 +1,8 @@
+# 题库是内容文件（贡献者手写），不做格式化：
+# 一来避免给贡献者制造巨大 diff，二来避免工具改动题目/答案文本
+src/data/bank/
+
+# 构建产物与依赖
+dist/
+node_modules/
+coverage/

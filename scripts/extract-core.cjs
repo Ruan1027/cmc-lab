@@ -22,13 +22,23 @@ const w = dom.window;
 // 等脚本执行完
 setTimeout(() => {
   const fns = [
-    'normKnowledge', 'normKnowledgeList', 'domainOf',
-    'normalizeExpr', 'tryEval', 'looseMatch', 'answerMatch',
-    'parseMarkdown', 'sourceGroup'
+    'normKnowledge',
+    'normKnowledgeList',
+    'domainOf',
+    'normalizeExpr',
+    'tryEval',
+    'looseMatch',
+    'answerMatch',
+    'parseMarkdown',
+    'sourceGroup',
   ];
   const consts = [
-    'KNOWLEDGE_ALIAS', 'KNOWLEDGE_DOMAIN', 'DOMAIN_ORDER',
-    'FIELD_MAP', 'FN_MAP', 'FN_SHORT'
+    'KNOWLEDGE_ALIAS',
+    'KNOWLEDGE_DOMAIN',
+    'DOMAIN_ORDER',
+    'FIELD_MAP',
+    'FN_MAP',
+    'FN_SHORT',
   ];
 
   const parts = [];

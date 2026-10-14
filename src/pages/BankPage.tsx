@@ -45,7 +45,9 @@ export function BankPage() {
       return;
     }
     const r = importMarkdown(value);
-    notify(`导入完成：新增 ${r.added} 题${r.skipped ? `，跳过重复 ${r.skipped} 题` : ''}${note ? `（${note}）` : ''}`);
+    notify(
+      `导入完成：新增 ${r.added} 题${r.skipped ? `，跳过重复 ${r.skipped} 题` : ''}${note ? `（${note}）` : ''}`,
+    );
     setText('');
   };
 
@@ -74,8 +76,8 @@ export function BankPage() {
         <h2>📥 导入题库</h2>
         <div className="hint">
           每题以 <code>## 标题</code> 开头，字段用 <code>字段名: 内容</code>。
-          支持：类型、知识点、难度、分值、题目、选项、答案、备选、思路、易错点、解析。
-          公式用 <code>$...$</code>。
+          支持：类型、知识点、难度、分值、题目、选项、答案、备选、思路、易错点、解析。 公式用{' '}
+          <code>$...$</code>。
         </div>
         <div
           onDragOver={(e) => {
@@ -132,8 +134,15 @@ export function BankPage() {
           onChange={(e) => setText(e.target.value)}
         />
         <div className="actions">
-          <button className="btn btn-pri" onClick={() => runImport(text, '')}>解析并导入</button>
-          <button className="btn" onClick={() => download(exportJSON(), `cmc-backup-${Date.now()}.json`, 'application/json')}>
+          <button className="btn btn-pri" onClick={() => runImport(text, '')}>
+            解析并导入
+          </button>
+          <button
+            className="btn"
+            onClick={() =>
+              download(exportJSON(), `cmc-backup-${Date.now()}.json`, 'application/json')
+            }
+          >
             导出备份 (JSON)
           </button>
           <button
@@ -165,7 +174,13 @@ export function BankPage() {
               setPage(0);
             }}
           />
-          <select value={type} onChange={(e) => { setType(e.target.value); setPage(0); }}>
+          <select
+            value={type}
+            onChange={(e) => {
+              setType(e.target.value);
+              setPage(0);
+            }}
+          >
             <option value="">全部题型</option>
             <option value="choice">选择题</option>
             <option value="fill">填空题</option>
@@ -179,7 +194,9 @@ export function BankPage() {
           pageItems.map((p) => (
             <div className="item" key={p.id}>
               <div style={{ flex: 1, minWidth: 0 }}>
-                <b>[{TYPE_NAME[p.type]}] {p.source}</b>
+                <b>
+                  [{TYPE_NAME[p.type]}] {p.source}
+                </b>
                 <div style={{ fontSize: 13, color: 'var(--sub)' }}>{p.stem.slice(0, 70)}…</div>
                 <div className="meta">
                   {sourceGroup(p.source)} · 难度 {p.difficulty}
@@ -187,8 +204,12 @@ export function BankPage() {
                 </div>
               </div>
               <div style={{ display: 'flex', flexDirection: 'column', gap: 6, flexShrink: 0 }}>
-                <button className="btn" onClick={() => setPreview(p)}>预览</button>
-                <button className="btn" onClick={() => startSession([p.id])}>练习</button>
+                <button className="btn" onClick={() => setPreview(p)}>
+                  预览
+                </button>
+                <button className="btn" onClick={() => startSession([p.id])}>
+                  练习
+                </button>
               </div>
             </div>
           ))
@@ -196,11 +217,19 @@ export function BankPage() {
 
         {pageCount > 1 && (
           <div className="actions" style={{ justifyContent: 'center' }}>
-            <button className="btn" disabled={page === 0} onClick={() => setPage(page - 1)}>上一页</button>
+            <button className="btn" disabled={page === 0} onClick={() => setPage(page - 1)}>
+              上一页
+            </button>
             <span style={{ alignSelf: 'center', fontSize: 13, color: 'var(--sub)' }}>
               {page + 1} / {pageCount}
             </span>
-            <button className="btn" disabled={page + 1 >= pageCount} onClick={() => setPage(page + 1)}>下一页</button>
+            <button
+              className="btn"
+              disabled={page + 1 >= pageCount}
+              onClick={() => setPage(page + 1)}
+            >
+              下一页
+            </button>
           </div>
         )}
       </div>
@@ -232,12 +261,20 @@ export function BankPage() {
           {pitfallsFor(preview).length > 0 && (
             <div className="tip">
               <b>⚠ 易错点</b>
-              <ul>{pitfallsFor(preview).map((t) => <li key={t}>{t}</li>)}</ul>
+              <ul>
+                {pitfallsFor(preview).map((t) => (
+                  <li key={t}>{t}</li>
+                ))}
+              </ul>
             </div>
           )}
           <div className="actions">
-            <button className="btn btn-pri" onClick={() => setPreview(null)}>关闭</button>
-            <button className="btn" onClick={() => startSession([preview.id])}>练习这道题</button>
+            <button className="btn btn-pri" onClick={() => setPreview(null)}>
+              关闭
+            </button>
+            <button className="btn" onClick={() => startSession([preview.id])}>
+              练习这道题
+            </button>
           </div>
         </div>
       )}

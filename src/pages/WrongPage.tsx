@@ -32,7 +32,11 @@ export function WrongPage() {
     <div className="card">
       <h2>❌ 错题集</h2>
       <div className="actions" style={{ marginTop: 0 }}>
-        <button className="btn btn-pri" disabled={!unmasteredIds.length} onClick={() => startSession(unmasteredIds)}>
+        <button
+          className="btn btn-pri"
+          disabled={!unmasteredIds.length}
+          onClick={() => startSession(unmasteredIds)}
+        >
           重做全部错题（{unmasteredIds.length}）
         </button>
         <button className="btn" onClick={() => setShowMastered(!showMastered)}>
@@ -54,7 +58,11 @@ export function WrongPage() {
                 <b>{p.source}</b>
                 <div style={{ fontSize: 13, color: 'var(--sub)' }}>{p.stem.slice(0, 80)}…</div>
                 <div className="meta">
-                  错 {meta.count} 次 · {p.knowledge.map((k) => domainOf(k)).slice(0, 2).join('、') || '—'}
+                  错 {meta.count} 次 ·{' '}
+                  {p.knowledge
+                    .map((k) => domainOf(k))
+                    .slice(0, 2)
+                    .join('、') || '—'}
                   {topReason && ` · 主因：${REASON_LABEL[topReason[0]] || topReason[0]}`}
                   {meta.mastered && ' · ✅ 已掌握'}
                 </div>
@@ -62,13 +70,17 @@ export function WrongPage() {
                   <div className="tip" style={{ marginTop: 8 }}>
                     <b>⚠ 易错点</b>
                     <ul>
-                      {pitfalls.slice(0, 2).map((t) => <li key={t}>{t}</li>)}
+                      {pitfalls.slice(0, 2).map((t) => (
+                        <li key={t}>{t}</li>
+                      ))}
                     </ul>
                   </div>
                 )}
               </div>
               <div style={{ display: 'flex', flexDirection: 'column', gap: 6, flexShrink: 0 }}>
-                <button className="btn" onClick={() => startSession([id])}>重做</button>
+                <button className="btn" onClick={() => startSession([id])}>
+                  重做
+                </button>
                 <button className="btn" onClick={() => markMastered(id, !meta.mastered)}>
                   {meta.mastered ? '取消掌握' : '已掌握'}
                 </button>
