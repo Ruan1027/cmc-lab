@@ -4,11 +4,25 @@
 
 [中文](#功能特性) | [English](#features)
 
+[![CI](https://github.com/Ruan1027/cmc-lab/actions/workflows/ci.yml/badge.svg)](https://github.com/Ruan1027/cmc-lab/actions/workflows/ci.yml)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](./LICENSE)
+[![Node](https://img.shields.io/badge/node-%3E%3D20-brightgreen.svg)](https://nodejs.org)
+
 CMC Lab 是一个完全离线可用的竞赛备考工具：内置 101 道历年真题（第 10–17 届，含补赛），  
 支持**按知识模块追踪进度**、**限时整卷模考**、**错题复盘**与**公式速查**，  
 并根据你的报考组别和剩余备考时间自动生成每日任务。
 
 它不是又一个「能刷题的页面」，而是一个**有目标、有节奏、可复盘**的备考系统。
+
+## 仓库地址
+
+- GitHub（主仓库）：https://github.com/Ruan1027/cmc-lab
+- Gitee（国内镜像）：配置中，见 [docs/GITEE.md](./docs/GITEE.md)
+
+```bash
+git clone https://github.com/Ruan1027/cmc-lab.git
+cd cmc-lab && npm install && npm run dev
+```
 
 ---
 
