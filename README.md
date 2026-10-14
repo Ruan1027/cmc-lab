@@ -5,6 +5,7 @@
 [中文](#功能特性) | [English](#features)
 
 [![CI](https://github.com/Ruan1027/cmc-lab/actions/workflows/ci.yml/badge.svg)](https://github.com/Ruan1027/cmc-lab/actions/workflows/ci.yml)
+[![Pages](https://github.com/Ruan1027/cmc-lab/actions/workflows/pages.yml/badge.svg)](https://github.com/Ruan1027/cmc-lab/actions/workflows/pages.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](./LICENSE)
 [![Node](https://img.shields.io/badge/node-%3E%3D20-brightgreen.svg)](https://nodejs.org)
 
@@ -17,7 +18,12 @@ CMC Lab 是一个完全离线可用的竞赛备考工具：内置 101 道历年�
 ## 仓库地址
 
 - GitHub（主仓库）：https://github.com/Ruan1027/cmc-lab
+- 在线版：https://ruan1027.github.io/cmc-lab/
 - Gitee（国内镜像）：配置中，见 [docs/GITEE.md](./docs/GITEE.md)
+
+**不想装环境？** [在线用](https://ruan1027.github.io/cmc-lab/)，或到
+[Releases](https://github.com/Ruan1027/cmc-lab/releases/latest) 下载单文件版
+（约 2 MB，双击即用，完全离线）。
 
 ```bash
 git clone https://github.com/Ruan1027/cmc-lab.git
