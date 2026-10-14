@@ -2,6 +2,29 @@
 
 本项目遵循 [Semantic Versioning](https://semver.org/)，格式参考 [Keep a Changelog](https://keepachangelog.com/)。
 
+## [1.0.0] - 2026-10-14
+
+首个正式版。MVP 的全部功能经过测试验证，并补齐了开源分发渠道。
+
+### 新增
+
+- **GitHub Pages 在线版**：推送即自动部署，免安装打开即用（`pages.yml`）
+- **Release 单文件分发**：打 `v*` 标签自动构建 `CMC-Lab-<版本>.html` 并挂到 Release 附件，
+  不装 Node 的用户下载双击即可运行（`release.yml`）
+- favicon：内联 data-URI SVG，单文件构建下同样显示
+
+### 修复
+
+- README「使用方式」原先声称「仓库根目录的 `CMC Lab.html`」，该文件并不在仓库中，
+  已改为在线版 / Releases / 自行构建三条真实路径
+- 页面viewport 已移除 `maximum-scale=1`（禁用缩放伤及弱视用户，iOS 16+ 本就忽略）
+
+### 测试
+
+- 判题等价性、题库解析（101 题完整性）、组别模型、学习路径、评卷规则均覆盖单元测试
+- 单文件产物经 `scripts/verify-singlefile.cjs` 在 `file://` 协议下验证：启动、101 题加载、
+  KaTeX 渲染、零运行时错误
+
 ## [0.1.0] - 2026-10-14
 
 首个可运行版本（MVP）。从单文件 HTML 应用重构为 React + TypeScript + Vite 多端工程。

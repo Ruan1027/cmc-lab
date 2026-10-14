@@ -78,14 +78,31 @@ MVP 用 localStorage（零依赖，Capacitor 环境可用）。
 
 ## 扩展点
 
-| 想加什么 | 改动位置 |
-| --- | --- |
-| 新题型 | `types/ProblemType` + `pages/PracticePage` + `core/exam.ts` |
-| 新知识点 | `core/knowledge.ts` 的 `KNOWLEDGE_ALIAS` / `KNOWLEDGE_DOMAIN` |
-| 换持久化 | 新增 `storage/` 实现，替换 store 中的调用 |
-| 接后端 / 云同步 | 在 `storage/` 加远端仓储，`core/` 完全不动 |
-| 新公式 | `data/formulas.ts` |
-| 官方资讯源 | 替换 `data/news.ts` 的导出 |
+| 想加什么        | 改动位置                                                      |
+| --------------- | ------------------------------------------------------------- |
+| 新题型          | `types/ProblemType` + `pages/PracticePage` + `core/exam.ts`   |
+| 新知识点        | `core/knowledge.ts` 的 `KNOWLEDGE_ALIAS` / `KNOWLEDGE_DOMAIN` |
+| 换持久化        | 新增 `storage/` 实现，替换 store 中的调用                     |
+| 接后端 / 云同步 | 在 `storage/` 加远端仓储，`core/` 完全不动                    |
+| 新公式          | `data/formulas.ts`                                            |
+| 官方资讯源      | 替换 `data/news.ts` 的导出                                    |
+
+## 分发
+
+三种交付形态，全部由 CI 自动产出：
+
+| 形态       | 触发                                                    | 工作流                       | 产物                                |
+| ---------- | ------------------------------------------------------- | ---------------------------- | ----------------------------------- |
+| 在线版     | 推送 `master`                                           | `pages.yml` → GitHub Pages   | `https://<user>.github.io/cmc-lab/` |
+| 离线单文件 | 打 `v*` 标签                                            | `release.yml` → Release 附件 | `CMC-Lab-<版本>.html`（约 2 MB）    |
+| 原生 App   | 手动 `npx cap add android/ios` 后 `npm run cap:android` | —                            | Android Studio / Xcode 工程         |
+
+两个构建细节值得说明：
+
+- **Pages 无需配置 base**：vite `base: './'` 产出相对路径，仓库页面在 `/cmc-lab/` 子路径下直接可用
+- **单文件模式的三个坑**（实现在 `vite.config.ts` 的插件里，注释详尽）：IIFE 经典脚本
+  （`file://` 下 module 被 CORS 拦截）、转义字面量 `</script>`（否则 HTML 提前闭合脚本块）、
+  脚本移到 `</body>` 前（`defer` 对内联脚本无效）
 
 ## 测试策略
 

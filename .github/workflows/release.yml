@@ -1,0 +1,47 @@
+name: Release
+
+# 打 tag（如 v1.0.0）时自动构建单文件 HTML，并作为附件挂到 GitHub Release。
+# 这样不想装 Node 的人也能直接下载、双击使用。
+on:
+  push:
+    tags: ['v*']
+  workflow_dispatch:
+
+permissions:
+  contents: write # 创建 Release 需要
+
+jobs:
+  single-file:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: 使用 Node 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: 安装依赖
+        run: npm ci
+
+      # 发版前必须全绿，避免把带问题的构建发出去
+      - name: 单元测试
+        run: npm test
+
+      - name: 构建单文件
+        run: npm run build:single
+
+      - name: 重命名产物
+        run: cp dist/index.html "CMC-Lab-${GITHUB_REF_NAME}.html"
+
+      - name: 创建 Release 并上传附件
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          if gh release view "$GITHUB_REF_NAME" >/dev/null 2>&1; then
+            gh release upload "$GITHUB_REF_NAME" "CMC-Lab-$GITHUB_REF_NAME.html" --clobber
+          else
+            gh release create "$GITHUB_REF_NAME" "CMC-Lab-$GITHUB_REF_NAME.html" \
+              --title "CMC Lab $GITHUB_REF_NAME" --generate-notes
+          fi
