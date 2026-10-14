@@ -16,8 +16,8 @@ git remote add github git@github.com:<你的用户名>/cmc-lab.git
 git remote add gitee  git@gitee.com:<你的用户名>/cmc-lab.git
 
 # 一次性推送两边
-git push github main
-git push gitee  main
+git push github master
+git push gitee  master
 ```
 
 想省事可以设一个组合远端（一次 push 推两边）：
@@ -27,7 +27,7 @@ git remote add all git@github.com:<你的用户名>/cmc-lab.git
 git remote set-url --add --push all git@github.com:<你的用户名>/cmc-lab.git
 git remote set-url --add --push all git@gitee.com:<你的用户名>/cmc-lab.git
 
-git push all main
+git push all master
 ```
 
 ## 3. 自动同步（可选）
@@ -39,7 +39,7 @@ GitHub 侧用 Action 在推送后镜像到 Gitee：
 name: Mirror to Gitee
 on:
   push:
-    branches: [main]
+    branches: [master]
 jobs:
   mirror:
     runs-on: ubuntu-latest
@@ -62,7 +62,7 @@ Gitee 账号需完成实名认证才能正常使用。
 
 | 事项 | 说明 |
 | --- | --- |
-| 分支保护 | 两端都建议保护 `main`，要求 PR + CI 通过 |
+| 分支保护 | 两端都建议保护 `master`，要求 PR + CI 通过 |
 | CI | GitHub Actions 已配好（`.github/workflows/ci.yml`）；Gitee 的 Gitee Go 需另行开通 |
 | Issue 模板 | 两端共用 `.github/ISSUE_TEMPLATE/`（Gitee 兼容该目录） |
 | 仓库描述 | Gitee 上建议加中文简介与标签，利于站内搜索 |

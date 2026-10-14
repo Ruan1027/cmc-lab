@@ -1,10 +1,12 @@
 name: CI
 
+# 同时覆盖 main / master：GitHub 新建仓库默认 main，Gitee 默认 master，
+# 本项目本地分支为 master，写死一个名字会在另一边漏跑 CI
 on:
   push:
-    branches: [main]
+    branches: [main, master]
   pull_request:
-    branches: [main]
+    branches: [main, master]
 
 jobs:
   build:
