@@ -2,6 +2,23 @@
 
 本项目遵循 [Semantic Versioning](https://semver.org/)，格式参考 [Keep a Changelog](https://keepachangelog.com/)。
 
+## [1.6.0] - 2026-10-15
+
+学习报告导出：把分散在练习、模考、错题、复习里的数据聚合成一份可复盘、可分享的备考报告。
+
+### 新增
+
+- 「报告」页（导航新增 📈 入口）：聚合总览、知识模块进度、各维度（题型/难度/届次）正确率、薄弱知识点、错题 TOP、到期复习队列、限时模考记录、近期练习轨迹、备考建议
+- `src/core/report.ts`：纯函数 `buildReport(state)` 与 `reportToMarkdown(report)`，复用既有 `stats.ts` / `scheduler.ts` 统计逻辑，便于单测与复用
+- 导出 Markdown：一键生成 `cmc-学习报告-YYYY-MM-DD.md`（UTF-8，`text/markdown`）
+- 打印 / 导出 PDF：基于 `window.print` 零依赖实现，配套 `@media print` 样式只保留报告卡片，浏览器选「另存为 PDF」即可
+- 报告自动给出备考建议（薄弱模块优先、到期复习催收、模考补强等）
+- 新增 6 个报告单测（空数据 / 正常数据 / 薄弱点 / 到期复习 / Markdown 序列化 / 边界）
+
+### 注意
+
+- 报告页与导出逻辑全部走纯函数核心层，不触碰 DOM，与离线单文件版、在线版、App 三端共用同一份实现
+
 ## [1.5.0] - 2026-10-15
 
 题库导入校验器 CLI：让社区贡献题目时格式可被机器检查，降低坏数据进仓库的概率。

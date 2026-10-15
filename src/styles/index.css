@@ -674,3 +674,99 @@ textarea {
     font-size: 20px;
   }
 }
+
+/* —— 学习报告页 —— */
+.report-actions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+  margin-bottom: 8px;
+}
+.report-actions .actions {
+  display: flex;
+  gap: 8px;
+}
+.report-meta {
+  color: var(--muted);
+  font-size: 13px;
+  margin: 4px 0 12px;
+}
+.rpt-sub {
+  font-weight: 600;
+  color: var(--muted);
+  margin: 14px 0 6px;
+  font-size: 14px;
+}
+.rpt-table {
+  width: 100%;
+  border-collapse: collapse;
+  margin-bottom: 6px;
+  font-size: 14px;
+}
+.rpt-table th,
+.rpt-table td {
+  border: 1px solid var(--line, #e2e8f0);
+  padding: 6px 10px;
+  text-align: left;
+}
+.rpt-table th {
+  background: #f1f5f9;
+  font-weight: 600;
+}
+.rpt-table tr:nth-child(even) td {
+  background: #f8fafc;
+}
+.suggest-list {
+  margin: 6px 0 0;
+  padding-left: 20px;
+}
+.suggest-list li {
+  margin: 6px 0;
+  line-height: 1.5;
+}
+
+/* 打印 / 导出 PDF 时只保留报告卡片 */
+@media print {
+  body {
+    background: #fff !important;
+  }
+  .brand,
+  .tabbar,
+  .toast,
+  .nav-top,
+  .no-print {
+    display: none !important;
+  }
+  .app {
+    padding: 0 !important;
+    max-width: none !important;
+  }
+  .card {
+    box-shadow: none !important;
+    border: none !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    max-width: none !important;
+  }
+  .rpt-table th {
+    background: #f1f5f9 !important;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+  .rpt-table tr:nth-child(even) td {
+    background: #f8fafc !important;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+  h3 {
+    break-after: avoid;
+  }
+  table {
+    break-inside: auto;
+  }
+  .rpt-table tr {
+    break-inside: avoid;
+  }
+}

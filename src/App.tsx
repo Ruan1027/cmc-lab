@@ -8,9 +8,19 @@ import { ExamPage } from './pages/ExamPage';
 import { FormulaPage } from './pages/FormulaPage';
 import { BankPage } from './pages/BankPage';
 import { NewsPage } from './pages/NewsPage';
+import { ReportPage } from './pages/ReportPage';
 import { PwaInstall } from './components/PwaInstall';
 
-type PageKey = 'practice' | 'plan' | 'exam' | 'wrong' | 'stats' | 'formula' | 'news' | 'bank';
+type PageKey =
+  | 'practice'
+  | 'plan'
+  | 'exam'
+  | 'wrong'
+  | 'stats'
+  | 'formula'
+  | 'news'
+  | 'bank'
+  | 'report';
 
 const PAGES: Array<{ key: PageKey; icon: string; label: string; Component: () => JSX.Element }> = [
   { key: 'plan', icon: '🎯', label: '备考', Component: PlanPage },
@@ -18,6 +28,7 @@ const PAGES: Array<{ key: PageKey; icon: string; label: string; Component: () =>
   { key: 'exam', icon: '⏱', label: '模考', Component: ExamPage },
   { key: 'wrong', icon: '❌', label: '错题', Component: WrongPage },
   { key: 'stats', icon: '📊', label: '统计', Component: StatsPage },
+  { key: 'report', icon: '📄', label: '报告', Component: ReportPage },
   { key: 'formula', icon: '📖', label: '手册', Component: FormulaPage },
   { key: 'news', icon: '📢', label: '资讯', Component: NewsPage },
   { key: 'bank', icon: '📥', label: '题库', Component: BankPage },
