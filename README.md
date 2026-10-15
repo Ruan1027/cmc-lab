@@ -194,7 +194,7 @@ cmc-lab/
 - [x] PWA 离线安装（地铁、考场外也能刷，可「安装为 App」）
 - [x] 持久化迁移到 IndexedDB（可插拔存储适配器：`file://` 走 localStorage，在线版/App 走 IndexedDB；将来云端后端同此接口接入，业务零改动）
 - [x] 图片题支持（几何图形、函数图像：题干/解析可内嵌 `![](data:...)`，Markdown 图片语法，离线单文件版同样可用）
-- [ ] 题库导入校验器 CLI（PR 时自动检查格式）
+- [x] 题库导入校验器 CLI（`scripts/validate-bank.cjs`：`npm run validate` 手动跑，PR 触发 GitHub Actions 自动校验格式）
 - [ ] 学习报告导出（Markdown / PDF）
 - [ ] 多端云同步（可选后端）
 

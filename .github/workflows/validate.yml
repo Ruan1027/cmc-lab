@@ -1,0 +1,24 @@
+name: 题库格式校验
+
+on:
+  pull_request:
+    paths:
+      - 'src/data/bank/**'
+      - 'scripts/validate-bank.cjs'
+  push:
+    branches: [master]
+    paths:
+      - 'src/data/bank/**'
+      - 'scripts/validate-bank.cjs'
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      # 校验器为零依赖脚本，无需 install 即可运行
+      - name: 校验题库格式
+        run: node scripts/validate-bank.cjs
