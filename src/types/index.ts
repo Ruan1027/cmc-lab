@@ -56,6 +56,16 @@ export interface WrongEntry {
   lastResult?: AnswerResult;
   /** 错因计数，如 { calc: 2, method: 1 } */
   reasons?: Record<string, number>;
+  /** —— 以下为间隔重复调度字段（SM-2，见 core/scheduler.ts）——
+   *  全部可选：升级前保存的旧数据没有这些字段，由 schedOf() 兜底 */
+  /** 记忆难度系数 1.3 ~ 2.5 */
+  easiness?: number;
+  /** 当前间隔（天） */
+  interval?: number;
+  /** 下次复习时间戳；缺失视为立即到期 */
+  dueDate?: number;
+  /** 连续答对次数 */
+  reps?: number;
 }
 
 export interface StatsBucket {

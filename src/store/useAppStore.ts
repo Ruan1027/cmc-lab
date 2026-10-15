@@ -29,6 +29,7 @@ import {
 import { loadBuiltinProblems } from '../data/bank';
 import { parseMarkdown } from '../core/parser';
 import { sourceGroup } from '../core/knowledge';
+import { nextSched, schedOf } from '../core/scheduler';
 
 type Bag = Record<string, StatsBucket>;
 
@@ -82,18 +83,35 @@ function applyResult(
 
   if (result === 'correct') {
     if (wrongBook[p.id]) {
-      wrongBook[p.id] = { ...wrongBook[p.id], mastered: true, lastResult: result };
+      // 曾经错过：推进间隔重复调度。掌握不是终点，到期后仍会被召回复习
+      const prev = wrongBook[p.id];
+      const sc = nextSched(schedOf(prev), 'correct');
+      wrongBook[p.id] = {
+        ...prev,
+        mastered: true,
+        lastResult: result,
+        easiness: sc.easiness,
+        interval: sc.interval,
+        dueDate: sc.dueDate,
+        reps: sc.reps,
+      };
     }
   } else {
     const prev = wrongBook[p.id] || { count: 0, lastWrong: 0, mastered: false, reasons: {} };
     const reasons = { ...(prev.reasons || {}) };
     if (reason) reasons[reason] = (reasons[reason] || 0) + 1;
+    // 答错/部分正确：按 SM-2 重新调度（答错重置间隔，部分正确放缓增速）
+    const sc = nextSched(schedOf(prev), result);
     wrongBook[p.id] = {
       count: prev.count + 1,
       lastWrong: Date.now(),
       mastered: false,
       lastResult: result,
       reasons,
+      easiness: sc.easiness,
+      interval: sc.interval,
+      dueDate: sc.dueDate,
+      reps: sc.reps,
     };
   }
 

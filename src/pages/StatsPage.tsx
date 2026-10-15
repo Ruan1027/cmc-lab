@@ -3,6 +3,7 @@ import { useMemo } from 'react';
 import { useAppStore } from '../store/useAppStore';
 import { moduleProgress, streakDays, weakKnowledgeList } from '../core/stats';
 import { problemsOfGroup } from '../core/groups';
+import { dueReviewIds } from '../core/scheduler';
 
 function Bar({ label, right, pct }: { label: string; right: string; pct: number }) {
   const color = pct >= 80 ? 'var(--ok)' : pct >= 50 ? 'var(--warn)' : 'var(--err)';
@@ -34,6 +35,10 @@ export function StatsPage() {
   const streak = streakDays(history);
   const rate = stats.attempts ? Math.round((stats.correct / stats.attempts) * 100) : 0;
   const unmastered = Object.values(wrongBook).filter((m) => !m.mastered).length;
+  const due = useMemo(
+    () => dueReviewIds(wrongBook, problems, Date.now(), Number.MAX_SAFE_INTEGER).length,
+    [wrongBook, problems],
+  );
 
   const pctOf = (b?: { attempts: number; correct: number }) =>
     b && b.attempts ? Math.round((b.correct / b.attempts) * 100) : 0;
@@ -53,6 +58,10 @@ export function StatsPage() {
         <div className="stat-box">
           <div className="stat-num">{unmastered}</div>
           <div className="stat-label">未掌握错题</div>
+        </div>
+        <div className="stat-box">
+          <div className="stat-num">{due}</div>
+          <div className="stat-label">待复习（到期）</div>
         </div>
         <div className="stat-box">
           <div className="stat-num">{streak}</div>

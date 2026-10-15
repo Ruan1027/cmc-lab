@@ -49,7 +49,7 @@ describe('buildTodayPlan', () => {
     expect(plan.tasks.reduce((s, t) => s + t.ids.length, 0)).toBe(2);
   });
 
-  it('错题优先出现在任务最前', () => {
+  it('旧错题（无调度字段）立即进入到期复习，排在最前', () => {
     const plan = buildTodayPlan(
       problems,
       statsOf(),
@@ -57,8 +57,48 @@ describe('buildTodayPlan', () => {
       { '3': { count: 1, lastWrong: Date.now(), mastered: false } },
       { ...DEFAULT_SETTINGS, dailyGoal: 3 },
     );
+    // 升级前保存的错题没有调度字段，schedOf 兜底为「立即到期」：
+    // 从没被安排过复习的题，先完整过一轮
     expect(plan.tasks[0].ids).toContain('3');
-    expect(plan.tasks[0].label).toContain('错题');
+    expect(plan.tasks[0].label).toContain('复习');
+    expect(plan.due).toBe(1);
+  });
+
+  it('到期复习优先于错题重做，且召回已掌握的题', () => {
+    const now = Date.now();
+    const plan = buildTodayPlan(
+      problems,
+      statsOf(),
+      [],
+      {
+        // 明天才到期、未掌握 → 应落到「重做错题」段
+        '1': {
+          count: 1,
+          lastWrong: now,
+          mastered: false,
+          dueDate: now + 86400000,
+          interval: 1,
+          reps: 1,
+          easiness: 2.5,
+        },
+        // 已到期、已掌握 → 仍应被召回复习（长间隔巩固）
+        '2': {
+          count: 2,
+          lastWrong: now,
+          mastered: true,
+          dueDate: now - 1000,
+          interval: 6,
+          reps: 3,
+          easiness: 2.5,
+        },
+      },
+      { ...DEFAULT_SETTINGS, dailyGoal: 5 },
+    );
+    expect(plan.tasks[0].label).toContain('到期复习');
+    expect(plan.tasks[0].ids).toEqual(['2']);
+    expect(plan.tasks[1].label).toContain('错题');
+    expect(plan.tasks[1].ids).toContain('1');
+    expect(plan.due).toBe(1);
   });
 
   it('已掌握错题不再享受「错题优先」，但仍会作为未做题出现', () => {

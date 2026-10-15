@@ -120,6 +120,10 @@ export function PlanPage() {
               <div className="stat-num">{streak}</div>
               <div className="stat-label">连续打卡（天）</div>
             </div>
+            <div className="stat-box">
+              <div className="stat-num">{plan.due}</div>
+              <div className="stat-label">待复习（题）</div>
+            </div>
           </div>
         )}
         {left !== null && left > 0 && (
@@ -192,7 +196,7 @@ export function PlanPage() {
           ))
         )}
         <div className="footer-note" style={{ textAlign: 'left' }}>
-          未做题 {plan.undone} 道 · 未掌握错题 {plan.wrong} 道
+          未做题 {plan.undone} 道 · 未掌握错题 {plan.wrong} 道 · 待复习 {plan.due} 道
           {plan.weak.length > 0 && ` · 薄弱点：${plan.weak.slice(0, 5).join('、')}`}
         </div>
       </div>

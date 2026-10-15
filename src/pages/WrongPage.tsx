@@ -1,8 +1,9 @@
-/** 错题本：按最近错误排序，支持重做、标记掌握、查看错因 */
+/** 错题本：待复习优先，支持重做、标记掌握、查看错因 */
 import { useMemo, useState } from 'react';
 import { useAppStore } from '../store/useAppStore';
 import { domainOf } from '../core/knowledge';
 import { pitfallsFor } from '../core/pitfalls';
+import { dueReviewIds, nextReviewText } from '../core/scheduler';
 
 const REASON_LABEL: Record<string, string> = {
   calc: '算错',
@@ -18,15 +19,27 @@ export function WrongPage() {
   const startSession = useAppStore((s) => s.startSession);
   const [showMastered, setShowMastered] = useState(false);
 
-  const entries = useMemo(
-    () =>
+  const entries = useMemo(() => {
+    const now = Date.now();
+    return (
       Object.entries(wrongBook)
         .filter(([, m]) => (showMastered ? true : !m.mastered))
-        .sort((a, b) => b[1].lastWrong - a[1].lastWrong),
-    [wrongBook, showMastered],
-  );
+        // 待复习的排前面（按到期时间），其余按最近错误倒序
+        .sort((a, b) => {
+          const da = a[1].dueDate || 0;
+          const db = b[1].dueDate || 0;
+          if (da <= now !== db <= now) return da <= now ? -1 : 1;
+          if (da <= now && db <= now) return da - db;
+          return b[1].lastWrong - a[1].lastWrong;
+        })
+    );
+  }, [wrongBook, showMastered]);
 
   const unmasteredIds = Object.keys(wrongBook).filter((id) => !wrongBook[id].mastered);
+  const dueIds = useMemo(
+    () => dueReviewIds(wrongBook, problems, Date.now(), Number.MAX_SAFE_INTEGER),
+    [wrongBook, problems],
+  );
 
   return (
     <div className="card">
@@ -38,6 +51,9 @@ export function WrongPage() {
           onClick={() => startSession(unmasteredIds)}
         >
           重做全部错题（{unmasteredIds.length}）
+        </button>
+        <button className="btn" disabled={!dueIds.length} onClick={() => startSession(dueIds)}>
+          🔁 复习到期题（{dueIds.length}）
         </button>
         <button className="btn" onClick={() => setShowMastered(!showMastered)}>
           {showMastered ? '隐藏已掌握' : '显示已掌握'}
@@ -65,6 +81,11 @@ export function WrongPage() {
                     .join('、') || '—'}
                   {topReason && ` · 主因：${REASON_LABEL[topReason[0]] || topReason[0]}`}
                   {meta.mastered && ' · ✅ 已掌握'}
+                  {(meta.dueDate || 0) <= Date.now() ? (
+                    <b style={{ color: 'var(--err)' }}> · 🔁 待复习</b>
+                  ) : (
+                    <span> · {nextReviewText(meta)}</span>
+                  )}
                 </div>
                 {!meta.mastered && pitfalls.length > 0 && (
                   <div className="tip" style={{ marginTop: 8 }}>
