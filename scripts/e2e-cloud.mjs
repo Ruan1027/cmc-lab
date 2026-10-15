@@ -10,7 +10,7 @@ function check(name, cond, detail = '') {
   if (!cond) ok = false;
 }
 
-const h = await fetch(`${URL_BASE}/auth/v1/health`);
+const h = await fetch(`${URL_BASE}/auth/v1/health`, { headers: { apikey: PUB } });
 check('auth /health 200', h.status === 200, `HTTP ${h.status} ${await h.text()}`);
 
 const r = await fetch(`${URL_BASE}/rest/v1/user_state?select=user_id`, {
