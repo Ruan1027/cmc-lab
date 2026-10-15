@@ -23,7 +23,7 @@ import {
   type PersistedState,
   type PracticeSnapshot,
 } from '../storage/repository';
-import { getAdapter } from '../storage';
+import { getAdapter, getCloudAdapter } from '../storage';
 import { loadBuiltinProblems } from '../data/bank';
 import { parseMarkdown } from '../core/parser';
 import { sourceGroup } from '../core/knowledge';
@@ -145,6 +145,8 @@ interface Actions {
   restoreBackup: (text: string) => void;
   exportJSON: () => string;
   resetAll: () => void;
+  /** 老用户迁移：把当前本地数据立即上传到云端 */
+  uploadLocalData: () => void;
 }
 
 export interface AppState extends Omit<PersistedState, 'practice'> {
@@ -365,6 +367,28 @@ export const useAppStore = create<AppState & Actions>()((set, get) => {
         session: { queue: [], idx: 0, marks: {}, setupHidden: false, resumed: false },
       });
       persist();
+    },
+
+    uploadLocalData: () => {
+      const a = getCloudAdapter();
+      if (!a) {
+        get().notify('当前环境未启用云同步');
+        return;
+      }
+      const s = get();
+      const snapshot: PersistedState = {
+        version: s.version,
+        problems: s.problems,
+        wrongBook: s.wrongBook,
+        stats: s.stats,
+        history: s.history,
+        flags: s.flags,
+        settings: s.settings,
+        exams: s.exams,
+        practice: null,
+      };
+      void a.uploadCurrent(snapshot);
+      get().notify('已把本地数据上传到云端');
     },
   };
 });

@@ -144,7 +144,7 @@ export function BankPage() {
         <h2>💾 数据备份（建议定期导出）</h2>
         <div className="hint">
           你的做题进度、错题、模考记录都存在<strong>当前浏览器</strong>里。换浏览器、清缓存或重装都会丢数据，
-          <strong>请定期导出备份</strong>。在线版将来会支持账号云同步，在那之前，备份是最可靠的兜底。
+          <strong>请定期导出备份</strong>。在线版已支持账号云同步（右上角「登录 / 同步」），登录后进度自动在多端同步；导出备份仍建议定期做，作为额外保险。
         </div>
         <div className="actions">
           <button

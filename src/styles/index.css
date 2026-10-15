@@ -770,3 +770,106 @@ textarea {
     break-inside: avoid;
   }
 }
+
+/* ===== 账户 / 云同步 ===== */
+.brand-right {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.account-chip {
+  border: 1px solid var(--line);
+  background: var(--card);
+  color: var(--txt);
+  border-radius: 999px;
+  padding: 6px 14px;
+  font-size: 13px;
+  cursor: pointer;
+}
+.account-chip:hover {
+  border-color: var(--pri);
+  color: var(--pri);
+}
+.sync-ind {
+  font-size: 12px;
+  color: var(--sub);
+  white-space: nowrap;
+}
+
+.modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(15, 23, 42, 0.45);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 50;
+  padding: 16px;
+}
+.modal {
+  width: 100%;
+  max-width: 380px;
+  margin: 0;
+}
+.modal-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 12px;
+}
+.modal-head .x {
+  border: none;
+  background: transparent;
+  font-size: 24px;
+  line-height: 1;
+  color: var(--sub);
+  cursor: pointer;
+}
+.auth-body {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.auth-tabs {
+  display: flex;
+  gap: 6px;
+}
+.auth-tabs button {
+  flex: 1;
+  border: 1px solid var(--line);
+  background: var(--card);
+  border-radius: 8px;
+  padding: 8px;
+  cursor: pointer;
+  font-size: 13px;
+}
+.auth-tabs button.active {
+  border-color: var(--pri);
+  color: var(--pri);
+  font-weight: 600;
+}
+.auth-pane {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.inp {
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 10px 12px;
+  font-size: 14px;
+  width: 100%;
+}
+.acct-info {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.sync-state {
+  font-size: 13px;
+  color: var(--ok);
+}
+.err {
+  color: var(--err);
+  font-size: 13px;
+}

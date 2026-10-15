@@ -86,6 +86,43 @@ SuperMemo SM-2 简化版（Anki 早期同源），纯函数：
 MVP 用 localStorage（零依赖，Capacitor 环境可用）。
 已抽象为接口，题库规模上去后换 IndexedDB 即可，上层无需改动。
 
+## 多端云同步（v2.0.0）
+
+### 适配器分层
+
+```
+┌──────────────────────────────────────────────┐
+│ CloudAdapter（有登录态时包装本地适配器）       │  load: 拉云端→mergeLWW→写回本地   │
+│                                              │  save: 本地落盘 + 防抖上传         │
+├──────────────────────────────────────────────┤
+│ LocalStorageAdapter / IndexedDBAdapter        │  纯本地，按运行环境选择            │
+├──────────────────────────────────────────────┤
+│ RemoteBackend（Supabase 实现，零依赖 fetch）  │  PostgREST 读写 user_state 表      │
+└──────────────────────────────────────────────┘
+```
+
+- `selectAdapter`：在线环境且存在 `getSupabaseConfig()` 时包一层 `CloudAdapter`；`file://` 永远不走云端
+- 未配置 / 未登录 / 离线 → `CloudAdapter` 安全降级为纯本地，行为与旧版一致
+
+### 同步子集与 LWW
+
+- `toSyncedPayload(state, builtinIds)`：从全局状态抽取 `SyncedPayload`
+  （`wrongBook/stats/history/exams/settings/flags/importedProblems`），**剥离内置 101 题**
+- `mergeLWW(local, remote, lastSyncAt, builtin)`：仅当 `remote.updated_at > lastSyncAt` 才采用远端字段，避免把旧本地数据写回
+- `applyPayload(local, payload, builtin)`：把云端数据合并回本地状态
+
+### 登录（src/auth）
+
+- `supabaseAuth.ts`：`loadSession/saveSession/clearSession`、`sha256Base64Url` + `randomUrlSafe`（PKCE）、
+  `startGithubOAuth`（重定向）、`handleGithubCallback`（code 兑换 token）、`sendOtp` / `verifyOtp`（邮箱/手机号）
+- `useAuthStore.ts`：Zustand store 封装登录态、同步状态机（`idle/syncing/synced/offline/error`）、`getAccessToken/getUserId`
+
+### 后端形态
+
+- 仅一个 `user_state(user_id PK, payload jsonb, updated_at timestamptz, schema_version int)` 表
+- RLS 4 策略均限制 `auth.uid() = user_id`，用户只能读写自己的行
+- 零依赖：因构建机缺 `@supabase/functions-js` 装不上官方 SDK，改用原生 `fetch` 直连 PostgREST + REST Auth
+
 ## 扩展点
 
 | 想加什么        | 改动位置                                                      |
@@ -94,6 +131,7 @@ MVP 用 localStorage（零依赖，Capacitor 环境可用）。
 | 新知识点        | `core/knowledge.ts` 的 `KNOWLEDGE_ALIAS` / `KNOWLEDGE_DOMAIN` |
 | 换持久化        | 新增 `storage/` 实现，替换 store 中的调用                     |
 | 接后端 / 云同步 | 在 `storage/` 加远端仓储，`core/` 完全不动                    |
+| 新登录方式      | 在 `auth/supabaseAuth.ts` 加对应流程，`useAuthStore` 暴露入口 |
 | 新公式          | `data/formulas.ts`                                            |
 | 官方资讯源      | 替换 `data/news.ts` 的导出                                    |
 

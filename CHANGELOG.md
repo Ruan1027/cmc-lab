@@ -2,6 +2,32 @@
 
 本项目遵循 [Semantic Versioning](https://semver.org/)，格式参考 [Keep a Changelog](https://keepachangelog.com/)。
 
+## [2.0.0] - 2026-10-15
+
+多端云同步：登录账号后学习数据跨设备自动同步，换设备 / 清缓存不再丢进度。路线图最后一项完成。
+
+### 新增
+
+- **账号体系与云同步**：右上角「账号」按钮 + 顶部同步状态指示；登录后 `CloudAdapter` 包装本地适配器自动推拉，未配置 / 未登录 / 离线时退化为纯本地，业务代码零改动
+- **三种登录方式（第一阶段）**：GitHub OAuth（PKCE 重定向 + code 兑换 token）、邮箱验证码 OTP、手机号短信验证码 OTP
+- **同步子集（SyncedPayload）**：仅 `{wrongBook, stats, history, exams, settings, flags, importedProblems}`，**内置 101 题永远本地重建、不同步**，避免冗余上传与多端互相覆盖
+- **零依赖 Supabase 直连**：原生 `fetch` 接 PostgREST + REST Auth（因官方 SDK 在本机构建环境装不上 `@supabase/functions-js`，改用直连更契合「少依赖」取向）；仅一个 `user_state` 表 + RLS 行级权限（`auth.uid() = user_id`）
+- **LWW 合并**：云端 `updated_at` 晚于本地 `lastSyncAt` 才采用，防把旧数据写回云端
+- **老用户迁移**：已登录用户可一键「上传本地数据到云端」，把升级前的本地进度首次推上去
+- **`supabase/migrations/0001_user_state.sql`**：建表 + 4 条 RLS 策略
+- **`.env.example`**：标注 `VITE_SUPABASE_URL` / `VITE_SUPABASE_ANON_KEY`；单文件构建不读取
+- **微信 / QQ / 平台生成账号 UID 登录**按计划放第二阶段，本期未实现（UI 已预留入口）
+
+### 架构
+
+- 存储层 `StorageAdapter` 接口新增 `CloudAdapter` 实现；`selectAdapter` 在在线环境且存在 Supabase 配置时自动包一层云端适配
+- 新增 `src/storage/{supabaseConfig,remote,supabaseBackend,cloudAdapter}.ts` 与 `src/auth/{supabaseAuth,useAuthStore}.ts`，全部走可 mock 的纯函数，便于单测
+
+### 测试
+
+- 新增 10 项云同步单测（`src/storage/__tests__/cloudAdapter.test.ts`）：子集剥离、LWW 新旧判定、未登录不触网、云端更新写回、出错退离线、防抖上传、clear 双清、Supabase 端点 mock
+- 全量：typecheck 0 / lint 0 / `npm test` 89 项通过 / 生产构建 + 单文件构建均通过，单文件 `modulepreload`=0（约 2 MB 可 `file://` 运行）
+
 ## [1.6.0] - 2026-10-15
 
 学习报告导出：把分散在练习、模考、错题、复习里的数据聚合成一份可复盘、可分享的备考报告。

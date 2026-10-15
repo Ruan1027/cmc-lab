@@ -46,6 +46,7 @@ cd cmc-lab && npm install && npm run dev
 | 📢 竞赛资讯 | 赛制、赛程规律、备考经验（数据源与页面解耦，方便后续接官方通知）                                                        |
 | 📥 题库管理 | 拖拽导入 Markdown、JSON 备份导出/恢复、题库搜索与预览                                                                   |
 | 📲 离线安装 | PWA：可「安装到桌面/手机」，首次在线访问后断网（地铁、考场外）也能刷题；支持一键安装提示                              |
+| ☁️ 多端云同步 | 登录账号后，学习数据（进度/错题/统计/模考/设置）跨设备自动同步；GitHub/邮箱/手机号短信三种登录，零依赖直连 Supabase |
 
 **题库构成**：第 10–14 届非数学类（含 13 届补赛、14 届第二次补赛）71 题 + 第 15–17 届非数学 A 类 30 题。
 
@@ -60,7 +61,7 @@ cd cmc-lab && npm install && npm run dev
 
 | 方式           | 适合                | 怎么做                                                                                                                 |
 | -------------- | ------------------- | ---------------------------------------------------------------------------------------------------------------------- |
-| **在线用**     | 什么都不想装        | 打开 [在线版](https://ruan1027.github.io/cmc-lab/)（GitHub Pages 自动部署，做题数据只存在你自己浏览器里）              |
+| **在线用**     | 什么都不想装        | 打开 [在线版](https://ruan1027.github.io/cmc-lab/)（GitHub Pages 自动部署，做题数据默认存你自己浏览器；登录账号后可跨设备云同步）              |
 | **下载单文件** | 想离线、双击就用    | 到 [Releases](https://github.com/Ruan1027/cmc-lab/releases) 下载最新版的 `CMC-Lab-<版本>.html`，双击打开，无需任何环境 |
 | **本地开发**   | 改代码              | `npm install && npm run dev` → http://localhost:5173                                                                   |
 | **构建部署**   | 自己发布 / 打包 App | `npm run build` → `dist/`                                                                                              |
@@ -123,7 +124,8 @@ npm run cap:ios             # 打开 Xcode（仅 macOS）
 - **KaTeX**：公式渲染比 MathJax 快一个数量级，且可离线打包（移动端刚需）
 - **原生 CSS 变量**：不引入 Tailwind / UI 框架。本项目 UI 不复杂，原生 CSS 足够表达设计语言，少两个依赖、贡献者无需学额外约定
 - **Vitest**：与 Vite 同源，零额外配置；核心算法全部有单测覆盖
-- **可插拔存储适配器（MVP → IndexedDB）**：仓储层抽象出统一 `StorageAdapter` 接口，`file://` 单文件走 localStorage（IndexedDB 在 file:// 不可靠），在线版 / 安装后的 App / Capacitor 走 IndexedDB（容量大、异步）；将来云端后端只需再挂一个实现，业务代码零改动
+- **可插拔存储适配器（MVP → IndexedDB → Cloud）**：仓储层抽象出统一 `StorageAdapter` 接口，`file://` 单文件走 localStorage（IndexedDB 在 file:// 不可靠），在线版 / 安装后的 App / Capacitor 走 IndexedDB（容量大、异步）；云端后端通过 `CloudAdapter` 包装本地适配器接入，**业务代码零改动**，未配置/未登录时自动退化为纯本地
+- **零依赖 Supabase 直连**：因构建环境缺少 `@supabase/functions-js` 无法安装官方 SDK，改用原生 `fetch` 直连 Supabase 的 REST Auth / PostgREST 接口，反而更契合项目「少依赖」取向（仅一个 `user_state` 表 + RLS 行级权限）
 
 ---
 
@@ -196,9 +198,41 @@ cmc-lab/
 - [x] 图片题支持（几何图形、函数图像：题干/解析可内嵌 `![](data:...)`，Markdown 图片语法，离线单文件版同样可用）
 - [x] 题库导入校验器 CLI（`scripts/validate-bank.cjs`：`npm run validate` 手动跑，PR 触发 GitHub Actions 自动校验格式）
 - [x] 学习报告导出（Markdown / PDF：总览、模块进度、各维度正确率、薄弱知识点、错题 TOP、到期复习、模考轨迹、备考建议，可导出 Markdown 或打印为 PDF）
-- [ ] 多端云同步（可选后端）
+- [x] 多端云同步（可选后端：Supabase；GitHub / 邮箱 / 手机号短信登录，仅同步学习数据，内置 101 题永远本地重建不同步）
 
 欢迎提 Issue 或 PR，见 [CONTRIBUTING.md](./CONTRIBUTING.md)。
+
+---
+
+## 多端云同步（v2.0.0）
+
+登录账号后，你的**学习数据**会自动跨设备同步（网页 ↔ App ↔ 换浏览器），换设备/清缓存也不再丢进度。
+
+### 同步什么
+
+- **同步**：错题本、练习/模考记录、统计、设置、导入的自定义题库、复习调度标记
+- **不同步**：内置 101 道真题。它们人人相同、本地永远由 `loadBuiltinProblems()` 重建，
+  上传既冗余又会在多端互相覆盖，因此同步子集（`SyncedPayload`）只取学习数据
+
+### 登录方式（第一阶段）
+
+- GitHub OAuth（PKCE 重定向）
+- 邮箱验证码（OTP）
+- 手机号短信验证码（OTP）
+
+> 微信 / QQ / 平台生成的账号 UID 登录按计划放在第二阶段，本期未实现（UI 已预留入口）。
+
+### 双模式定位
+
+- **在线版 / App**：登录后自动同步，右上角有「账号」按钮与顶部同步状态指示
+- **`file://` 单文件版**：永远本地匿名、不读 `.env`、不触网，行为与旧版完全一致
+
+### 安全与隐私
+
+- 仅一个 `user_state` 表，行级权限（RLS）限制 `auth.uid() = user_id`，用户只能读写自己的数据
+- 同步采用 LWW（Last-Write-Wins）：云端 `updated_at` 晚于本地 `lastSyncAt` 才采用，避免把旧数据写回云端
+- 配置通过 `.env`（在线构建）注入 `VITE_SUPABASE_URL` / `VITE_SUPABASE_ANON_KEY`，
+  单文件构建不读取，详见 [.env.example](./.env.example) 与 [docs/ARCHITECTURE.md](./docs/ARCHITECTURE.md)
 
 ---
 

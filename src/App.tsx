@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useAppStore } from './store/useAppStore';
+import { useAuthStore } from './auth/useAuthStore';
 import { PracticePage } from './pages/PracticePage';
 import { WrongPage } from './pages/WrongPage';
 import { StatsPage } from './pages/StatsPage';
@@ -10,6 +11,8 @@ import { BankPage } from './pages/BankPage';
 import { NewsPage } from './pages/NewsPage';
 import { ReportPage } from './pages/ReportPage';
 import { PwaInstall } from './components/PwaInstall';
+import { AccountButton } from './components/AccountButton';
+import { SyncIndicator } from './components/SyncIndicator';
 
 type PageKey =
   | 'practice'
@@ -36,14 +39,21 @@ const PAGES: Array<{ key: PageKey; icon: string; label: string; Component: () =>
 
 export function App() {
   const [page, setPage] = useState<PageKey>('plan');
-  const hydrate = useAppStore((s) => s.hydrate);
   const hydrated = useAppStore((s) => s.hydrated);
   const toast = useAppStore((s) => s.toast);
   const problems = useAppStore((s) => s.problems);
 
+  // 先初始化鉴权（恢复会话 / 处理 GitHub 回调），再 hydrate 拉取云端合并
   useEffect(() => {
-    hydrate();
-  }, [hydrate]);
+    let cancelled = false;
+    (async () => {
+      await useAuthStore.getState().init();
+      if (!cancelled) await useAppStore.getState().hydrate();
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   const Current = PAGES.find((p) => p.key === page)?.Component ?? PracticePage;
 
@@ -66,6 +76,10 @@ export function App() {
             </button>
           ))}
         </nav>
+        <div className="brand-right">
+          <SyncIndicator />
+          <AccountButton />
+        </div>
       </div>
 
       {hydrated ? (
