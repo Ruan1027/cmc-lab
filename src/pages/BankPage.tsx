@@ -26,6 +26,7 @@ export function BankPage() {
   const [text, setText] = useState('');
   const [dragging, setDragging] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
+  const restoreRef = useRef<HTMLInputElement>(null);
 
   const filtered = useMemo(() => {
     const kw = q.trim().toLowerCase();
@@ -70,6 +71,18 @@ export function BankPage() {
     a.click();
   };
 
+  const restoreFromFile = (file: File) => {
+    if (!confirm('恢复备份将覆盖当前全部数据，确定继续？建议先导出当前备份。')) return;
+    void file.text().then((t) => {
+      try {
+        restoreBackup(t);
+        notify('备份已恢复');
+      } catch (err) {
+        notify((err as Error).message);
+      }
+    });
+  };
+
   return (
     <>
       <div className="card">
@@ -106,24 +119,11 @@ export function BankPage() {
           <input
             ref={fileRef}
             type="file"
-            accept=".md,.markdown,.txt,.json"
+            accept=".md,.markdown,.txt"
             multiple
             hidden
             onChange={(e) => {
-              const files = e.target.files;
-              const json = files && Array.from(files).find((f) => /\.json$/i.test(f.name));
-              if (json) {
-                void json.text().then((t) => {
-                  try {
-                    restoreBackup(t);
-                    notify('备份已恢复');
-                  } catch (err) {
-                    notify((err as Error).message);
-                  }
-                });
-              } else {
-                void pickFiles(files);
-              }
+              void pickFiles(e.target.files);
               e.target.value = '';
             }}
           />
@@ -137,16 +137,29 @@ export function BankPage() {
           <button className="btn btn-pri" onClick={() => runImport(text, '')}>
             解析并导入
           </button>
+        </div>
+      </div>
+
+      <div className="card">
+        <h2>💾 数据备份（建议定期导出）</h2>
+        <div className="hint">
+          你的做题进度、错题、模考记录都存在<strong>当前浏览器</strong>里。换浏览器、清缓存或重装都会丢数据，
+          <strong>请定期导出备份</strong>。在线版将来会支持账号云同步，在那之前，备份是最可靠的兜底。
+        </div>
+        <div className="actions">
           <button
-            className="btn"
+            className="btn btn-pri"
             onClick={() =>
               download(exportJSON(), `cmc-backup-${Date.now()}.json`, 'application/json')
             }
           >
-            导出备份 (JSON)
+            📤 导出备份 (JSON)
+          </button>
+          <button className="btn" onClick={() => restoreRef.current?.click()}>
+            📥 恢复备份
           </button>
           <button
-            className="btn"
+            className="btn ghost"
             onClick={() => {
               if (!confirm('确定清空全部数据并恢复内置题库？建议先导出备份。')) return;
               resetAll();
@@ -156,6 +169,17 @@ export function BankPage() {
             重置数据
           </button>
         </div>
+        <input
+          ref={restoreRef}
+          type="file"
+          accept=".json"
+          hidden
+          onChange={(e) => {
+            const file = e.target.files?.[0];
+            if (file) restoreFromFile(file);
+            e.target.value = '';
+          }}
+        />
       </div>
 
       <div className="card">

@@ -1,9 +1,9 @@
 /**
- * 持久化层
+ * 持久化层 —— 纯逻辑部分
  *
- * MVP 用 localStorage：零依赖、在 Capacitor（iOS/Android）环境下同样可用。
- * 抽象成接口是为了后续平滑替换到 IndexedDB（题库与作答记录增长后
- * localStorage 的 5MB 上限会成为瓶颈），届时只需换一个实现，上层不动。
+ * 这里只放「与存储介质无关」的代码：状态形状、默认值、归一化、备份序列化。
+ * 真正的读写（localStorage / IndexedDB / 将来云端）都收口在 storage/ 下的适配器里，
+ * 见 localAdapter.ts 与 indexedDbAdapter.ts，以及 index.ts 的环境选择。
  */
 import type {
   ExamGroup,
@@ -16,6 +16,7 @@ import type {
 } from '../types';
 import { DEFAULT_SETTINGS } from './defaults';
 import { GROUP_OPTIONS } from '../core/groups';
+import { STORAGE_KEY } from './types';
 
 export interface PracticeSnapshot {
   queue: string[];
@@ -37,7 +38,7 @@ export interface PersistedState {
 }
 
 export const SCHEMA_VERSION = 1;
-const KEY = 'cmc_lab_state_v1';
+export const STORAGE_KEY_LEGACY = STORAGE_KEY;
 const HISTORY_MAX = 2000;
 
 export function emptyState(): PersistedState {
@@ -54,57 +55,41 @@ export function emptyState(): PersistedState {
   };
 }
 
-export function loadState(): PersistedState {
-  try {
-    const raw = localStorage.getItem(KEY);
-    if (!raw) return emptyState();
-    const parsed = JSON.parse(raw) as Partial<PersistedState>;
-    const base = emptyState();
-    const settings = { ...base.settings, ...(parsed.settings || {}) };
-    // 校验组别：以 GROUP_OPTIONS 为准，避免旧数据残留无效值后出现空白页
-    const validGroups = GROUP_OPTIONS.map((o) => o.value);
-    if (!validGroups.includes(settings.group)) {
-      settings.group = DEFAULT_SETTINGS.group as ExamGroup;
-    }
-    return {
-      version: SCHEMA_VERSION,
-      problems: parsed.problems || [],
-      wrongBook: parsed.wrongBook || {},
-      stats: { ...base.stats, ...(parsed.stats || {}) },
-      history: parsed.history || [],
-      flags: parsed.flags || {},
-      settings,
-      exams: parsed.exams || [],
-      practice: parsed.practice || null,
-    };
-  } catch {
-    return emptyState();
-  }
-}
-
 /**
- * 写入持久化状态，返回是否成功。
+ * 把任意（可能残缺 / 来自旧版本）的输入归一化为完整、可信的 PersistedState。
  *
- * 返回布尔值而不是静默吞掉异常：localStorage 写满（QuotaExceededError）时
- * 数据其实没存上，若不告知用户，他会以为进度已保存，下次打开全没了——
- * 这是最伤用户的失败方式，必须让上层有机会提示导出备份。
+ * 这是数据完整性的唯一闸门：缺字段用默认值补、非法组别回落默认，避免旧数据
+ * 残留无效值导致页面空白或崩溃。被各适配器在读取后统一调用。
  */
-export function saveState(state: PersistedState): boolean {
-  try {
-    const trimmed: PersistedState = {
-      ...state,
-      history: state.history.slice(-HISTORY_MAX),
-      exams: state.exams.slice(-50),
-    };
-    localStorage.setItem(KEY, JSON.stringify(trimmed));
-    return true;
-  } catch {
-    return false;
+export function normalizeState(input: Partial<PersistedState> | null | undefined): PersistedState {
+  const base = emptyState();
+  const parsed = input || {};
+  const settings = { ...base.settings, ...(parsed.settings || {}) };
+  // 校验组别：以 GROUP_OPTIONS 为准，避免旧数据残留无效值后出现空白页
+  const validGroups = GROUP_OPTIONS.map((o) => o.value);
+  if (!validGroups.includes(settings.group)) {
+    settings.group = DEFAULT_SETTINGS.group as ExamGroup;
   }
+  return {
+    version: SCHEMA_VERSION,
+    problems: parsed.problems || [],
+    wrongBook: parsed.wrongBook || {},
+    stats: { ...base.stats, ...(parsed.stats || {}) },
+    history: parsed.history || [],
+    flags: parsed.flags || {},
+    settings,
+    exams: parsed.exams || [],
+    practice: parsed.practice || null,
+  };
 }
 
-export function clearState(): void {
-  localStorage.removeItem(KEY);
+/** 备份落盘前对历史/模考记录做上限裁剪，避免无限膨胀撑爆存储 */
+export function trimForPersist(state: PersistedState): PersistedState {
+  return {
+    ...state,
+    history: state.history.slice(-HISTORY_MAX),
+    exams: state.exams.slice(-50),
+  };
 }
 
 export function exportBackup(state: PersistedState): string {
@@ -122,11 +107,5 @@ export function parseBackup(text: string): PersistedState {
   if (!data || typeof data !== 'object') throw new Error('备份格式不对：内容不是对象');
   const obj = data as Partial<PersistedState>;
   if (!Array.isArray(obj.problems)) throw new Error('备份格式不对：缺少 problems 字段');
-  const base = emptyState();
-  return {
-    ...base,
-    ...obj,
-    stats: { ...base.stats, ...(obj.stats || {}) },
-    settings: { ...base.settings, ...(obj.settings || {}) },
-  };
+  return normalizeState(obj);
 }

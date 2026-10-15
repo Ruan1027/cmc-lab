@@ -2,6 +2,26 @@
 
 本项目遵循 [Semantic Versioning](https://semver.org/)，格式参考 [Keep a Changelog](https://keepachangelog.com/)。
 
+## [1.3.0] - 2026-10-15
+
+把持久化从「裸 localStorage」重构为可插拔存储适配器，为更大题库与将来的云端后端铺路。
+
+### 新增
+
+- **可插拔 `StorageAdapter` 接口**（`src/storage/`）：统一隔离「数据存哪、怎么存」，业务层只认接口不认实现
+- **IndexedDB 适配器**：在线版 / 安装后的 App / Capacitor 改用 IndexedDB 持久化（容量大、异步写入，不再受 localStorage 5MB 上限约束）
+- **`file://` 单文件模式自动走 localStorage**：IndexedDB 在 file:// 下不可靠，按运行环境自动选择，单文件双击体验不变
+- **首次运行自动迁移**：旧版本写在 localStorage 的数据自动迁入 IndexedDB，并清理旧键（避免「重置后又复活」）
+
+### 优化
+
+- **「题库」页新增独立「💾 数据备份」卡片**：导出 / 恢复 / 重置按钮更醒目，并提示「清缓存会丢数据、请定期导出备份」，缓解无账号期的痛点
+- 写入串行化（write-chain），快速连续保存不再互相打断事务
+
+### 架构
+
+- 将来接入云端后端（账号体系）只需再实现一个 `CloudAdapter`，store 与各页面无需改动
+
 ## [1.2.0] - 2026-10-15
 
 支持「安装为 App」与离线使用，让备考不挑网络。

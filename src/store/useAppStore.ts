@@ -17,15 +17,13 @@ import type {
   WrongEntry,
 } from '../types';
 import {
-  clearState,
   emptyState,
   exportBackup,
-  loadState,
   parseBackup,
-  saveState,
   type PersistedState,
   type PracticeSnapshot,
 } from '../storage/repository';
+import { getAdapter } from '../storage';
 import { loadBuiltinProblems } from '../data/bank';
 import { parseMarkdown } from '../core/parser';
 import { sourceGroup } from '../core/knowledge';
@@ -157,10 +155,10 @@ export interface AppState extends Omit<PersistedState, 'practice'> {
 }
 
 export const useAppStore = create<AppState & Actions>()((set, get) => {
-  /** 把当前持久字段落盘；失败时提示用户导出备份 */
+  /** 把当前持久字段落盘；失败时提示用户导出备份（异步、不阻塞交互） */
   const persist = () => {
     const s = get();
-    const ok = saveState({
+    const snapshot: PersistedState = {
       version: s.version,
       problems: s.problems,
       wrongBook: s.wrongBook,
@@ -175,11 +173,12 @@ export const useAppStore = create<AppState & Actions>()((set, get) => {
         marks: s.session.marks,
         setupHidden: s.session.setupHidden,
       } as PracticeSnapshot,
-    });
-    if (!ok) {
-      get().notify('保存失败：浏览器存储空间可能已满，请到「题库」页导出备份');
-    }
-    return ok;
+    };
+    void getAdapter()
+      .save(snapshot)
+      .then((ok) => {
+        if (!ok) get().notify('保存失败：浏览器存储空间可能已满，请到「题库」页导出备份');
+      });
   };
 
   return {
@@ -198,22 +197,24 @@ export const useAppStore = create<AppState & Actions>()((set, get) => {
       }, 2600);
     },
 
-    hydrate: () => {
-      const saved = loadState();
-      const problems = saved.problems.length ? saved.problems : loadBuiltinProblems();
+    hydrate: async () => {
+      const saved = await getAdapter().load();
+      const base = saved ?? emptyState();
+      const problems = base.problems.length ? base.problems : loadBuiltinProblems();
+      const { practice, ...persisted } = base;
       set({
-        ...saved,
+        ...persisted,
         problems,
         hydrated: true,
         session: {
-          queue: saved.practice?.queue || [],
-          idx: saved.practice?.idx || 0,
-          marks: (saved.practice?.marks || {}) as Record<string, AnswerResult>,
-          setupHidden: !!saved.practice?.setupHidden,
-          resumed: !!saved.practice?.queue?.length,
+          queue: practice?.queue || [],
+          idx: practice?.idx || 0,
+          marks: (practice?.marks || {}) as Record<string, AnswerResult>,
+          setupHidden: !!practice?.setupHidden,
+          resumed: !!practice?.queue?.length,
         },
       });
-      if (!saved.problems.length) persist();
+      if (!base.problems.length) persist();
     },
 
     importMarkdown: (text) => {
@@ -355,7 +356,7 @@ export const useAppStore = create<AppState & Actions>()((set, get) => {
     },
 
     resetAll: () => {
-      clearState();
+      void getAdapter().clear();
       const fresh = emptyState();
       const { practice: _practice, ...rest } = fresh;
       set({

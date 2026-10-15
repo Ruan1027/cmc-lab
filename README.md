@@ -123,7 +123,7 @@ npm run cap:ios             # 打开 Xcode（仅 macOS）
 - **KaTeX**：公式渲染比 MathJax 快一个数量级，且可离线打包（移动端刚需）
 - **原生 CSS 变量**：不引入 Tailwind / UI 框架。本项目 UI 不复杂，原生 CSS 足够表达设计语言，少两个依赖、贡献者无需学额外约定
 - **Vitest**：与 Vite 同源，零额外配置；核心算法全部有单测覆盖
-- **localStorage（MVP）**：零依赖且 Capacitor 环境可用；已抽象为仓储层，题库扩大后平滑迁移 IndexedDB
+- **可插拔存储适配器（MVP → IndexedDB）**：仓储层抽象出统一 `StorageAdapter` 接口，`file://` 单文件走 localStorage（IndexedDB 在 file:// 不可靠），在线版 / 安装后的 App / Capacitor 走 IndexedDB（容量大、异步）；将来云端后端只需再挂一个实现，业务代码零改动
 
 ---
 
@@ -192,7 +192,7 @@ cmc-lab/
 - [x] 知识模块进度、限时模考、学习路径、公式手册
 - [x] 间隔重复复习算法（SM-2：到期自动召回复习，已掌握题长间隔巩固）
 - [x] PWA 离线安装（地铁、考场外也能刷，可「安装为 App」）
-- [ ] 持久化迁移到 IndexedDB（支撑更大规模题库与作答历史）
+- [x] 持久化迁移到 IndexedDB（可插拔存储适配器：`file://` 走 localStorage，在线版/App 走 IndexedDB；将来云端后端同此接口接入，业务零改动）
 - [ ] 图片题支持（几何图形、函数图像）
 - [ ] 题库导入校验器 CLI（PR 时自动检查格式）
 - [ ] 学习报告导出（Markdown / PDF）
