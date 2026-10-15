@@ -267,6 +267,16 @@ textarea {
   margin-bottom: 8px;
   font-weight: 500;
 }
+/* 题干 / 解析内嵌图片（data URI 离线可用） */
+.rich-img {
+  display: block;
+  max-width: 100%;
+  height: auto;
+  margin: 10px auto;
+  border-radius: 8px;
+  border: 1px solid var(--line, #e5e7eb);
+  background: #fff;
+}
 .tag {
   display: inline-block;
   background: #f1f5f9;
