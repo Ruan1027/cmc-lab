@@ -1,5 +1,5 @@
 import { useAuthStore } from '../auth/useAuthStore';
-import { getSupabaseConfig } from '../storage/supabaseConfig';
+import { getSupabaseConfig, isFileProtocol } from '../storage/supabaseConfig';
 
 const SYNC: Record<string, { icon: string; text: string }> = {
   idle: { icon: '⚪', text: '未同步' },
@@ -13,7 +13,7 @@ const SYNC: Record<string, { icon: string; text: string }> = {
 export function SyncIndicator() {
   const user = useAuthStore((s) => s.user);
   const status = useAuthStore((s) => s.syncStatus);
-  if (!getSupabaseConfig() || !user) return null;
+  if (isFileProtocol() || !getSupabaseConfig() || !user) return null;
   const s = SYNC[status] ?? SYNC.idle;
   return (
     <span className="sync-ind" title="云同步状态">

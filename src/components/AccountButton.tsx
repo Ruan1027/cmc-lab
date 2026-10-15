@@ -1,17 +1,17 @@
 import { useState } from 'react';
 import { useAuthStore } from '../auth/useAuthStore';
-import { getSupabaseConfig } from '../storage/supabaseConfig';
+import { getSupabaseConfig, isFileProtocol } from '../storage/supabaseConfig';
 import { AccountModal } from './AccountModal';
 
 /**
- * 右上角账户入口：未配置 Supabase（如 file:// 单文件版）时整块隐藏。
+ * 右上角账户入口：file:// 单文件版（或未配置云端）时整块隐藏。
  * 在线版 / App 显示，点开为登录或同步管理弹窗。
  */
 export function AccountButton() {
   const user = useAuthStore((s) => s.user);
   const [open, setOpen] = useState(false);
 
-  if (!getSupabaseConfig()) return null;
+  if (isFileProtocol() || !getSupabaseConfig()) return null;
 
   return (
     <>

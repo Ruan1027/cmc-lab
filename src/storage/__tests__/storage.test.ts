@@ -1,5 +1,5 @@
 import 'fake-indexeddb/auto';
-import { describe, it, expect, beforeEach } from 'vitest';
+import { describe, it, expect, beforeEach, vi } from 'vitest';
 
 // Node 环境下没有 localStorage，提供一个内存实现供 LocalStorageAdapter 与迁移测试使用
 class MemStorage {
@@ -38,7 +38,17 @@ import {
 import { LocalStorageAdapter } from '../localAdapter';
 import { IndexedDBAdapter } from '../indexedDbAdapter';
 import { selectAdapter } from '../index';
+import { CloudAdapter } from '../cloudAdapter';
 import { STORAGE_KEY } from '../types';
+
+// 可切换的云端配置 mock：默认 null（纯本地语义），个别用例再打开
+const cfgState = vi.hoisted(() => ({
+  config: null as { url: string; anonKey: string } | null,
+}));
+vi.mock('../supabaseConfig', () => ({
+  getSupabaseConfig: () => cfgState.config,
+  isFileProtocol: () => false,
+}));
 
 function fullState(): PersistedState {
   return { ...emptyState(), problems: [{ id: 'p1', type: 'fill', source: 't', stem: 's' }] as PersistedState['problems'] };
@@ -101,6 +111,16 @@ describe('selectAdapter（环境选择，file:// 强约束）', () => {
     expect(selectAdapter({ protocol: 'https:', hasIndexedDB: false })).toBeInstanceOf(
       LocalStorageAdapter,
     );
+  });
+  it('http + 配置了云端 → CloudAdapter 包装（含本地回退能力）', () => {
+    cfgState.config = { url: 'https://example.supabase.co', anonKey: 'test-key' };
+    try {
+      expect(selectAdapter({ protocol: 'http:', hasIndexedDB: true })).toBeInstanceOf(
+        CloudAdapter,
+      );
+    } finally {
+      cfgState.config = null;
+    }
   });
 });
 

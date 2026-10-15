@@ -1,0 +1,16 @@
+name: e2e-cloud
+
+# 云同步后端冒烟探针：从 GitHub 的网络（非本机）验证 Supabase 可达 + RLS 生效。
+# 手动触发（Actions 页 Run workflow），也可用 gh CLI：gh workflow run e2e-cloud
+on:
+  workflow_dispatch:
+
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - run: node scripts/e2e-cloud.mjs
