@@ -8,6 +8,7 @@ import { ExamPage } from './pages/ExamPage';
 import { FormulaPage } from './pages/FormulaPage';
 import { BankPage } from './pages/BankPage';
 import { NewsPage } from './pages/NewsPage';
+import { PwaInstall } from './components/PwaInstall';
 
 type PageKey = 'practice' | 'plan' | 'exam' | 'wrong' | 'stats' | 'formula' | 'news' | 'bank';
 
@@ -37,6 +38,7 @@ export function App() {
 
   return (
     <div className="app">
+      <PwaInstall />
       <div className="brand">
         <div>
           <h1>CMC Lab</h1>

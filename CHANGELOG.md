@@ -2,6 +2,31 @@
 
 本项目遵循 [Semantic Versioning](https://semver.org/)，格式参考 [Keep a Changelog](https://keepachangelog.com/)。
 
+## [1.2.0] - 2026-10-15
+
+支持「安装为 App」与离线使用，让备考不挑网络。
+
+### 新增
+
+- **PWA 离线安装**：新增 `manifest.webmanifest` 与 `public/icons/`（192/512 PNG + 满铺 maskable + SVG 矢量，
+  沿用 favicon 的蓝色 ∑ 设计），可「安装到桌面/手机」，独立图标与启动屏
+- **Service Worker 离线缓存**：`public/sw.js` 预缓存应用壳，导航请求 network-first + 回退缓存、
+  静态资源 stale-while-revalidate；首次在线访问后即支持断网刷题（地铁、考场外）
+- **安装提示横幅**：`PwaInstall` 组件监听 `beforeinstallprompt`，在满足条件时给出可关闭的「安装」入口；
+  `main.tsx` 仅在「生产构建 + http(s)」下注册 SW，`file://` 单文件模式自动跳过
+
+### 兼容性
+
+- 零新增运行时依赖：PWA 用原生 manifest + 手写 Service Worker 实现，延续项目「少依赖」取向
+- 图标由 `scripts/gen-icons.py`（纯标准库，无需 Pillow/ImageMagick）生成，CI 与普通开发机都能复现
+- README 路线图勾选「PWA 离线安装」；功能特性表新增「离线安装」一行
+
+### 测试
+
+- 沿用既有 52 项单测；typecheck / lint 零问题
+- 生产构建 `dist/` 含 `sw.js`、`manifest.webmanifest`、`icons/`；单文件 `build:single` 仍正常产出 2MB
+  可 `file://` 双击运行的 HTML（无 module/preload 残留）
+
 ## [1.1.0] - 2026-10-15
 
 把「凭感觉重做错题」升级为「按遗忘曲线安排复习」。

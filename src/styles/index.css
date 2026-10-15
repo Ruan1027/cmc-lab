@@ -609,6 +609,44 @@ textarea {
   border-color: var(--warn);
 }
 
+/* ---- PWA 安装提示 ---- */
+.pwa-install {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  background: #eff6ff;
+  border: 1px solid #bfdbfe;
+  border-radius: 10px;
+  padding: 10px 14px;
+  margin-bottom: 14px;
+  font-size: 13px;
+  color: #1e40af;
+  flex-wrap: wrap;
+}
+.pwa-install__text {
+  flex: 1 1 auto;
+  min-width: 160px;
+}
+.pwa-install__actions {
+  display: flex;
+  gap: 8px;
+}
+.pwa-install__btn {
+  border: 1px solid var(--pri);
+  background: var(--pri);
+  color: #fff;
+  padding: 6px 14px;
+  border-radius: 8px;
+  cursor: pointer;
+  font-size: 13px;
+  min-height: 34px;
+}
+.pwa-install__btn.ghost {
+  background: #fff;
+  color: var(--pri);
+}
+
 @media (max-width: 720px) {
   .nav-top {
     display: none;
