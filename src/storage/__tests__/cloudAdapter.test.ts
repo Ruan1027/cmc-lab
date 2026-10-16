@@ -8,12 +8,16 @@ import {
   type SyncedPayload,
 } from '../remote';
 import { CloudAdapter } from '../cloudAdapter';
-import { createSupabaseBackend } from '../supabaseBackend';
+import { createCloudBackend } from '../cloudBackend';
 import type { StorageAdapter } from '../types';
 import { emptyState, type PersistedState } from '../repository';
 import type { Problem } from '../../types';
 import { loadBuiltinProblems } from '../../data/bank';
 import { useAuthStore } from '../../auth/useAuthStore';
+
+// 云端客户端 mock：默认 null（未接入云服务），需要时由用例注入假客户端
+const sdkState = vi.hoisted(() => ({ cloud: null as unknown }));
+vi.mock('../../cloud/sdk', () => ({ getCloud: () => sdkState.cloud }));
 
 function mkProblem(id: string): Problem {
   return {
@@ -91,7 +95,15 @@ function makeRemote() {
 }
 
 beforeEach(() => {
-  useAuthStore.setState({ user: null, session: null, ready: true, syncStatus: 'idle', lastSyncAt: null, error: null });
+  sdkState.cloud = null;
+  useAuthStore.setState({
+    user: null,
+    username: null,
+    ready: true,
+    syncStatus: 'idle',
+    lastSyncAt: null,
+    error: null,
+  });
 });
 
 describe('remote 纯逻辑', () => {
@@ -209,30 +221,105 @@ describe('CloudAdapter', () => {
   });
 });
 
-describe('createSupabaseBackend（fetch mock）', () => {
-  it('load / save / clear 调用正确端点', async () => {
-    const fetchMock = vi.fn(async (url: string, _init?: RequestInit) => {
-      if (String(url).includes('/user_state?')) {
-        return new Response(JSON.stringify([{ payload: mkPayload(), updated_at: new Date().toISOString() }]), {
-          status: 200,
-        });
-      }
-      return new Response('{}', { status: 200 });
+/**
+ * 极简假客户端：只实现 cloudBackend 用到的那几条链
+ * （from().select().maybeSingle() / from().upsert() / from().delete().eq()）
+ */
+function fakeCloud(res: {
+  load?: { data: unknown; error: unknown };
+  upsert?: { error: unknown };
+  owner?: { data: unknown; error: unknown };
+  remove?: { error: unknown };
+}) {
+  const ops: string[] = [];
+  let lastUpsert: Record<string, unknown> | null = null;
+  const cloud = {
+    database: {
+      from(table: string) {
+        ops.push(`from:${table}`);
+        return {
+          select(cols: string) {
+            ops.push(`select:${cols}`);
+            const r = cols.includes('owner_id') ? res.owner : res.load;
+            return { maybeSingle: async () => r ?? { data: null, error: null } };
+          },
+          upsert(values: Record<string, unknown>) {
+            ops.push('upsert');
+            lastUpsert = values;
+            return Promise.resolve(res.upsert ?? { error: null });
+          },
+          delete() {
+            ops.push('delete');
+            return {
+              eq: async (col: string, val: unknown) => {
+                ops.push(`eq:${col}=${String(val)}`);
+                return res.remove ?? { error: null };
+              },
+            };
+          },
+        };
+      },
+    },
+  };
+  return { cloud, ops, lastUpsert: () => lastUpsert };
+}
+
+describe('createCloudBackend（假客户端）', () => {
+  const updatedAt = new Date().toISOString();
+
+  it('load 读回 payload/updated_at，且不按 owner_id 过滤（交给 RLS）', async () => {
+    const payload = mkPayload({ flags: { a: 'star' } });
+    const { cloud, ops } = fakeCloud({ load: { data: { payload, updated_at: updatedAt }, error: null } });
+    sdkState.cloud = cloud;
+    const rec = await createCloudBackend().load('u1');
+    expect(rec?.payload.flags).toEqual({ a: 'star' });
+    expect(rec?.updated_at).toBe(updatedAt);
+    expect(ops).toEqual(['from:user_state', 'select:payload, updated_at']);
+    expect(ops.some((o) => o.startsWith('eq:'))).toBe(false);
+  });
+
+  it('云端无记录 → 返回 null', async () => {
+    const { cloud } = fakeCloud({ load: { data: null, error: null } });
+    sdkState.cloud = cloud;
+    expect(await createCloudBackend().load('u1')).toBeNull();
+  });
+
+  it('save 走 upsert，且写入体里不带 owner_id（由 DEFAULT auth.uid() 填）', async () => {
+    const { cloud, ops, lastUpsert } = fakeCloud({});
+    sdkState.cloud = cloud;
+    await createCloudBackend().save('u1', mkPayload({ version: 3 }), updatedAt);
+    expect(ops).toContain('upsert');
+    const body = lastUpsert() ?? {};
+    expect(body).not.toHaveProperty('owner_id');
+    expect(body.schema_version).toBe(3);
+    expect(body.updated_at).toBe(updatedAt);
+  });
+
+  it('clear 先读回自己的 owner_id 再按它删（避免无 WHERE 的整表删除）', async () => {
+    const { cloud, ops } = fakeCloud({ owner: { data: { owner_id: 'uid-9' }, error: null } });
+    sdkState.cloud = cloud;
+    await createCloudBackend().clear('u1');
+    expect(ops).toContain('select:owner_id');
+    expect(ops).toContain('eq:owner_id=uid-9');
+  });
+
+  it('云端没有记录时 clear 不发删除请求', async () => {
+    const { cloud, ops } = fakeCloud({ owner: { data: null, error: null } });
+    sdkState.cloud = cloud;
+    await createCloudBackend().clear('u1');
+    expect(ops).not.toContain('delete');
+  });
+
+  it('写失败（权限被拒 42501）抛出可识别错误', async () => {
+    const { cloud } = fakeCloud({
+      upsert: { error: { message: 'permission denied', code: '42501' } },
     });
-    const backend = createSupabaseBackend(
-      { url: 'https://x.supabase.co', anonKey: 'k' },
-      () => 'tok',
-      fetchMock as unknown as typeof fetch,
-    );
-    const rec = await backend.load('u1');
-    expect(rec).not.toBeNull();
-    await backend.save('u1', mkPayload(), new Date().toISOString());
-    expect(
-      fetchMock.mock.calls.some(
-        (c) => c[0].toString().includes('/rest/v1/user_state') && c[1]?.method === 'POST',
-      ),
-    ).toBe(true);
-    await backend.clear('u1');
-    expect(fetchMock.mock.calls.some((c) => c[1]?.method === 'DELETE')).toBe(true);
+    sdkState.cloud = cloud;
+    await expect(createCloudBackend().save('u1', mkPayload(), updatedAt)).rejects.toThrow(/42501/);
+  });
+
+  it('未接入云服务时直接抛错，不静默成功', async () => {
+    sdkState.cloud = null;
+    await expect(createCloudBackend().load('u1')).rejects.toThrow(/未接入云服务/);
   });
 });

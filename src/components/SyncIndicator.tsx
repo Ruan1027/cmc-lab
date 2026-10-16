@@ -1,5 +1,5 @@
 import { useAuthStore } from '../auth/useAuthStore';
-import { getSupabaseConfig, isFileProtocol } from '../storage/supabaseConfig';
+import { cloudEnabled } from '../cloud/cloudConfig';
 
 const SYNC: Record<string, { icon: string; text: string }> = {
   idle: { icon: '⚪', text: '未同步' },
@@ -9,11 +9,11 @@ const SYNC: Record<string, { icon: string; text: string }> = {
   error: { icon: '🔴', text: '同步失败' },
 };
 
-/** 顶部同步状态指示：仅在已登录且已配置云端时显示 */
+/** 顶部同步状态指示：仅在已接入云服务且已登录时显示 */
 export function SyncIndicator() {
   const user = useAuthStore((s) => s.user);
   const status = useAuthStore((s) => s.syncStatus);
-  if (isFileProtocol() || !getSupabaseConfig() || !user) return null;
+  if (!cloudEnabled() || !user) return null;
   const s = SYNC[status] ?? SYNC.idle;
   return (
     <span className="sync-ind" title="云同步状态">

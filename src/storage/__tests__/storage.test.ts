@@ -41,12 +41,13 @@ import { selectAdapter } from '../index';
 import { CloudAdapter } from '../cloudAdapter';
 import { STORAGE_KEY } from '../types';
 
-// 可切换的云端配置 mock：默认 null（纯本地语义），个别用例再打开
+// 可切换的云服务配置 mock：默认 null（纯本地语义），个别用例再打开
 const cfgState = vi.hoisted(() => ({
-  config: null as { url: string; anonKey: string } | null,
+  config: null as { endpoint: string; publishableKey: string } | null,
 }));
-vi.mock('../supabaseConfig', () => ({
-  getSupabaseConfig: () => cfgState.config,
+vi.mock('../../cloud/cloudConfig', () => ({
+  getCloudConfig: () => cfgState.config,
+  cloudEnabled: () => cfgState.config !== null,
   isFileProtocol: () => false,
 }));
 
@@ -113,7 +114,7 @@ describe('selectAdapter（环境选择，file:// 强约束）', () => {
     );
   });
   it('http + 配置了云端 → CloudAdapter 包装（含本地回退能力）', () => {
-    cfgState.config = { url: 'https://example.supabase.co', anonKey: 'test-key' };
+    cfgState.config = { endpoint: 'https://cmc-lab.app.workbuddy.host', publishableKey: 'wbpk_x' };
     try {
       expect(selectAdapter({ protocol: 'http:', hasIndexedDB: true })).toBeInstanceOf(
         CloudAdapter,

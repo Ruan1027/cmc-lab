@@ -18,12 +18,24 @@ CMC Lab 是一个完全离线可用的竞赛备考工具：内置 101 道历年�
 ## 仓库地址
 
 - GitHub（主仓库）：https://github.com/Ruan1027/cmc-lab
-- 在线版：https://ruan1027.github.io/cmc-lab/
+- **主在线版（带云同步）**：https://cmc-lab.app.workbuddy.host
+- GitHub Pages（**纯本地**开源版）：https://ruan1027.github.io/cmc-lab/
 - Gitee（国内镜像）：配置中，见 [docs/GITEE.md](./docs/GITEE.md)
 
-**不想装环境？** [在线用](https://ruan1027.github.io/cmc-lab/)，或到
+**为什么有两个在线版？**
+
+同一个代码库，构建时注入了云配置就是「主在线版」（可注册账号、跨设备同步），
+没注入就是「纯本地版」——数据只落在你自己的浏览器里，不发任何网络请求。
+
+云配置（`cloud.config.json`）**不在仓库里**，所以：
+
+- 你 fork 下来的仓库构建出的是**纯本地版**，不会被指到本项目作者的后端上
+- GitHub Pages 由本仓库 CI 自动部署，同样没有云配置 → 也是纯本地版
+- 想自己接后端，见 [docs/CLOUD.md](./docs/CLOUD.md)
+
+**不想装环境？** 直接打开上面的主在线版，或到
 [Releases](https://github.com/Ruan1027/cmc-lab/releases/latest) 下载单文件版
-（约 2 MB，双击即用，完全离线）。
+（约 2 MB，双击即用，完全离线、纯本地）。
 
 ```bash
 git clone https://github.com/Ruan1027/cmc-lab.git
@@ -46,7 +58,7 @@ cd cmc-lab && npm install && npm run dev
 | 📢 竞赛资讯 | 赛制、赛程规律、备考经验（数据源与页面解耦，方便后续接官方通知）                                                        |
 | 📥 题库管理 | 拖拽导入 Markdown、JSON 备份导出/恢复、题库搜索与预览                                                                   |
 | 📲 离线安装 | PWA：可「安装到桌面/手机」，首次在线访问后断网（地铁、考场外）也能刷题；支持一键安装提示                              |
-| ☁️ 多端云同步 | 登录账号后，学习数据（进度/错题/统计/模考/设置）跨设备自动同步；GitHub/邮箱/手机号短信三种登录，零依赖直连 Supabase |
+| ☁️ 多端云同步 | 登录账号后，学习数据（进度/错题/统计/模考/设置）跨设备自动同步；用户名/邮箱 + 密码登录，后端为 WorkBuddy 云服务 |
 
 **题库构成**：第 10–14 届非数学类（含 13 届补赛、14 届第二次补赛）71 题 + 第 15–17 届非数学 A 类 30 题。
 
@@ -59,12 +71,13 @@ cd cmc-lab && npm install && npm run dev
 
 四种，按你的习惯选：
 
-| 方式           | 适合                | 怎么做                                                                                                                 |
-| -------------- | ------------------- | ---------------------------------------------------------------------------------------------------------------------- |
-| **在线用**     | 什么都不想装        | 打开 [在线版](https://ruan1027.github.io/cmc-lab/)（GitHub Pages 自动部署，做题数据默认存你自己浏览器；登录账号后可跨设备云同步）              |
-| **下载单文件** | 想离线、双击就用    | 到 [Releases](https://github.com/Ruan1027/cmc-lab/releases) 下载最新版的 `CMC-Lab-<版本>.html`，双击打开，无需任何环境 |
-| **本地开发**   | 改代码              | `npm install && npm run dev` → http://localhost:5173                                                                   |
-| **构建部署**   | 自己发布 / 打包 App | `npm run build` → `dist/`                                                                                              |
+| 方式                 | 适合                | 怎么做                                                                                                                 |
+| -------------------- | ------------------- | ---------------------------------------------------------------------------------------------------------------------- |
+| **主在线版**         | 想跨设备同步        | 打开 <https://cmc-lab.app.workbuddy.host>，注册账号（用户名 + 邮箱 + 密码）后学习数据自动跟着账号走                      |
+| **GitHub Pages 版**  | 不想注册、只在本机用 | 打开 [在线版](https://ruan1027.github.io/cmc-lab/)（纯本地，数据存在你浏览器里，不联网）                                 |
+| **下载单文件**       | 想离线、双击就用    | 到 [Releases](https://github.com/Ruan1027/cmc-lab/releases) 下载最新版的 `CMC-Lab-<版本>.html`，双击打开，无需任何环境   |
+| **本地开发**         | 改代码              | `npm install && npm run dev` → http://localhost:5173                                                                   |
+| **构建部署**         | 自己发布 / 打包 App | `npm run build` → `dist/`                                                                                              |
 
 想自己生成单文件：`npm run build:single`（产物在 `dist/index.html`，复制出来即可双击运行）。
 每个版本发布时会自动构建并挂到 Release 附件，见 [.github/workflows/release.yml](./.github/workflows/release.yml)。
@@ -125,7 +138,8 @@ npm run cap:ios             # 打开 Xcode（仅 macOS）
 - **原生 CSS 变量**：不引入 Tailwind / UI 框架。本项目 UI 不复杂，原生 CSS 足够表达设计语言，少两个依赖、贡献者无需学额外约定
 - **Vitest**：与 Vite 同源，零额外配置；核心算法全部有单测覆盖
 - **可插拔存储适配器（MVP → IndexedDB → Cloud）**：仓储层抽象出统一 `StorageAdapter` 接口，`file://` 单文件走 localStorage（IndexedDB 在 file:// 不可靠），在线版 / 安装后的 App / Capacitor 走 IndexedDB（容量大、异步）；云端后端通过 `CloudAdapter` 包装本地适配器接入，**业务代码零改动**，未配置/未登录时自动退化为纯本地
-- **零依赖 Supabase 直连**：因构建环境缺少 `@supabase/functions-js` 无法安装官方 SDK，改用原生 `fetch` 直连 Supabase 的 REST Auth / PostgREST 接口，反而更契合项目「少依赖」取向（仅一个 `user_state` 表 + RLS 行级权限）
+- **账号体系：平台身份 = 邮箱，用户名是应用层的一层字典**：平台不支持用户名登录，也不存在「未经验证的密码注册」，所以注册先走邮箱验证码建号、再在 `accounts` 表登记用户名；登录时用户名先经服务端的口令闸门换回邮箱，再走平台密码登录。邮箱本身只对服务端可见（Server-only 表 + `SECURITY DEFINER` 函数），避免用户名→邮箱枚举。详见 [docs/CLOUD.md](./docs/CLOUD.md)
+- **云 SDK 只在需要时打包**：单文件离线版通过 vite alias 把云 SDK 换成空壳，Release 附件不背这 ~75 KB；在线版才是真货
 
 ---
 
@@ -148,14 +162,17 @@ cmc-lab/
 │   │   ├── formulas.ts   # 公式手册
 │   │   ├── pitfalls.ts   # 常见易错点库
 │   │   └── news.ts       # 竞赛资讯
-│   ├── storage/        # 持久化（仓储层，可替换实现）
+│   ├── cloud/          # 云服务客户端（配置读取 + SDK 单例 + 单文件空壳）
+│   ├── storage/        # 持久化（仓储层，可替换实现；CloudAdapter 在此）
+│   ├── auth/           # 账号：登录/注册状态机 + 用户名校验规则
 │   ├── store/          # Zustand 全局状态
 │   ├── components/     # 通用组件
 │   ├── pages/          # 8 个页面
 │   ├── types/          # 领域模型
 │   └── styles/         # 原生 CSS
-├── docs/               # 架构说明、双平台仓库配置
-├── scripts/            # 一次性迁移脚本
+├── db/                 # 云端数据库结构（表 / RLS / 函数，逐条执行的权威记录）
+├── docs/               # 架构说明、云同步设计、双平台仓库配置
+├── scripts/            # 题库校验器、云探针、单文件校验等
 └── .github/            # Issue / PR 模板、CI
 ```
 
@@ -198,15 +215,15 @@ cmc-lab/
 - [x] 图片题支持（几何图形、函数图像：题干/解析可内嵌 `![](data:...)`，Markdown 图片语法，离线单文件版同样可用）
 - [x] 题库导入校验器 CLI（`scripts/validate-bank.cjs`：`npm run validate` 手动跑，PR 触发 GitHub Actions 自动校验格式）
 - [x] 学习报告导出（Markdown / PDF：总览、模块进度、各维度正确率、薄弱知识点、错题 TOP、到期复习、模考轨迹、备考建议，可导出 Markdown 或打印为 PDF）
-- [x] 多端云同步（可选后端：Supabase；GitHub / 邮箱 / 手机号短信登录，仅同步学习数据，内置 101 题永远本地重建不同步）
+- [x] 多端云同步（后端：WorkBuddy 云服务；用户名/邮箱 + 密码登录，仅同步学习数据，内置 101 题永远本地重建不同步）
 
 欢迎提 Issue 或 PR，见 [CONTRIBUTING.md](./CONTRIBUTING.md)。
 
 ---
 
-## 多端云同步（v2.0.0）
+## 多端云同步（v2.1.0）
 
-登录账号后，你的**学习数据**会自动跨设备同步（网页 ↔ App ↔ 换浏览器），换设备/清缓存也不再丢进度。
+登录账号后，你的**学习数据**会自动跨设备同步（手机 ↔ 电脑 ↔ 换浏览器），换设备/清缓存也不再丢进度。
 
 ### 同步什么
 
@@ -214,25 +231,43 @@ cmc-lab/
 - **不同步**：内置 101 道真题。它们人人相同、本地永远由 `loadBuiltinProblems()` 重建，
   上传既冗余又会在多端互相覆盖，因此同步子集（`SyncedPayload`）只取学习数据
 
-### 登录方式（第一阶段）
+### 账号怎么用
 
-- GitHub OAuth（PKCE 重定向）
-- 邮箱验证码（OTP）
-- 手机号短信验证码（OTP）
+| 步骤 | 填什么                                        |
+| ---- | --------------------------------------------- |
+| 注册 | 用户名 + 邮箱 → 收邮箱验证码 → 设密码 → 建号  |
+| 登录 | 用户名 **或** 邮箱 + 密码                     |
+| 忘记密码 | 邮箱 + 验证码 + 新密码                     |
 
-> 微信 / QQ / 平台生成的账号 UID 登录按计划放在第二阶段，本期未实现（UI 已预留入口）。
+用户名要**全站唯一**（大小写不敏感），已存在会提示「该用户名已存在，请重新设置」。
+用户名支持 2–20 位中文 / 字母 / 数字 / 下划线。
 
-### 双模式定位
+> 平台不支持用户名登录，所以用户名是应用层加的一层字典：登录时先用用户名换回邮箱
+> （服务端校验口令后才返回，防止拿用户名批量枚举邮箱），再走平台的邮箱 + 密码登录。
 
-- **在线版 / App**：登录后自动同步，右上角有「账号」按钮与顶部同步状态指示
-- **`file://` 单文件版**：永远本地匿名、不读 `.env`、不触网，行为与旧版完全一致
+### 三种形态的定位
+
+| 形态 | 云同步 | 数据存哪 | 联网 |
+| --- | --- | --- | --- |
+| **主在线版**（workbuddy.host 域名） | ✅ 登录后自动同步 | 云端 + 本机 | 是 |
+| **GitHub Pages 版 / 自行 fork 构建** | ❌ 无账号入口 | 仅本机浏览器 | 否 |
+| **单文件 Release 版** | ❌ 无账号入口 | 仅本机浏览器 | 否 |
+
+后两种是同一个代码库在**没有** `cloud.config.json` 时的构建结果 —— 这是仓库里不含云配置的直接效果：
+fork 下来就是纯本地开源版。
 
 ### 安全与隐私
 
-- 仅一个 `user_state` 表，行级权限（RLS）限制 `auth.uid() = user_id`，用户只能读写自己的数据
+- 数据库三张表全部开启行级权限（RLS）：`user_state` 只允许 `authenticated` 读写自己那一行；
+  `accounts` / `account_secrets` 是 **Server-only**（开 RLS + 零策略 + 零 GRANT），只能经服务端函数访问
+- **邮箱不作为可读字段暴露**：用户名→邮箱必须通过口令闸门，口令不对返回 `null`，无法区分
+  「用户名不存在」和「密码错」
+- 口令在服务端存 bcrypt 散列（`pgcrypto`），前端不接触、不落盘
 - 同步采用 LWW（Last-Write-Wins）：云端 `updated_at` 晚于本地 `lastSyncAt` 才采用，避免把旧数据写回云端
-- 配置通过 `.env`（在线构建）注入 `VITE_SUPABASE_URL` / `VITE_SUPABASE_ANON_KEY`，
-  单文件构建不读取，详见 [.env.example](./.env.example) 与 [docs/ARCHITECTURE.md](./docs/ARCHITECTURE.md)
+- 云配置（`cloud.config.json`）不入仓库，`publishableKey` 只标识应用、不带权限，安全边界在服务端 Origin 精确匹配 + RLS
+
+完整设计、自建后端的步骤、以及「哪些能验、哪些必须在发布域名上人工验」见
+[docs/CLOUD.md](./docs/CLOUD.md)；表结构与函数定义见 [db/schema.sql](./db/schema.sql)。
 
 ---
 

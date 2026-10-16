@@ -40,3 +40,6 @@ Thumbs.db
 .env
 .env.local
 .env.*.local
+
+# 云服务公开配置（每个部署自己的，不进仓库；模板见 cloud.config.example.json）
+cloud.config.json

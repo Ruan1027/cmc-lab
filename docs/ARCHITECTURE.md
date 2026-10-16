@@ -86,7 +86,9 @@ SuperMemo SM-2 简化版（Anki 早期同源），纯函数：
 MVP 用 localStorage（零依赖，Capacitor 环境可用）。
 已抽象为接口，题库规模上去后换 IndexedDB 即可，上层无需改动。
 
-## 多端云同步（v2.0.0）
+## 多端云同步（v2.1.0）
+
+完整设计（账号模型、权限边界、自建后端、验证边界）见 [CLOUD.md](./CLOUD.md)。
 
 ### 适配器分层
 
@@ -97,12 +99,15 @@ MVP 用 localStorage（零依赖，Capacitor 环境可用）。
 ├──────────────────────────────────────────────┤
 │ LocalStorageAdapter / IndexedDBAdapter        │  纯本地，按运行环境选择            │
 ├──────────────────────────────────────────────┤
-│ RemoteBackend（Supabase 实现，零依赖 fetch）  │  PostgREST 读写 user_state 表      │
+│ RemoteBackend（cloudBackend.ts）              │  经 SDK 读写 user_state 表         │
+├──────────────────────────────────────────────┤
+│ @tencent-ai/workbuddy-cloud-sdk               │  数据面 /.cloud/**（与应用同源）    │
 └──────────────────────────────────────────────┘
 ```
 
-- `selectAdapter`：在线环境且存在 `getSupabaseConfig()` 时包一层 `CloudAdapter`；`file://` 永远不走云端
+- `selectAdapter`：在线环境且 `getCloudConfig()` 有值时包一层 `CloudAdapter`；`file://` 永远不走云端
 - 未配置 / 未登录 / 离线 → `CloudAdapter` 安全降级为纯本地，行为与旧版一致
+- 云配置由构建期注入（`cloud.config.json` → define 常量），仓库里不含真实地址
 
 ### 同步子集与 LWW
 
@@ -111,17 +116,27 @@ MVP 用 localStorage（零依赖，Capacitor 环境可用）。
 - `mergeLWW(local, remote, lastSyncAt, builtin)`：仅当 `remote.updated_at > lastSyncAt` 才采用远端字段，避免把旧本地数据写回
 - `applyPayload(local, payload, builtin)`：把云端数据合并回本地状态
 
-### 登录（src/auth）
+### 账号（src/auth）
 
-- `supabaseAuth.ts`：`loadSession/saveSession/clearSession`、`sha256Base64Url` + `randomUrlSafe`（PKCE）、
-  `startGithubOAuth`（重定向）、`handleGithubCallback`（code 兑换 token）、`sendOtp` / `verifyOtp`（邮箱/手机号）
-- `useAuthStore.ts`：Zustand store 封装登录态、同步状态机（`idle/syncing/synced/offline/error`）、`getAccessToken/getUserId`
+平台不支持用户名登录 —— **平台身份 = 邮箱，用户名是应用层的一层字典**。
 
-### 后端形态
+- `useAuthStore.ts`：注册/登录/忘记密码/补设用户名四个动作 + 同步状态机
+  （`idle/syncing/synced/offline/error`）。发码挑战存在闭包里（跨事件保留、不触发重渲染、不持久化）
+- `username.ts`：用户名校验规则，**与数据库侧 `fn_register_account` 里的正则必须一致**
+- 登录：标识符含 `@` 直连平台密码登录；否则先 `rpc fn_login_email(username, password)`
+  换回邮箱（服务端口令闸门，防止用户名→邮箱枚举），再走平台密码登录
 
-- 仅一个 `user_state(user_id PK, payload jsonb, updated_at timestamptz, schema_version int)` 表
-- RLS 4 策略均限制 `auth.uid() = user_id`，用户只能读写自己的行
-- 零依赖：因构建机缺 `@supabase/functions-js` 装不上官方 SDK，改用原生 `fetch` 直连 PostgREST + REST Auth
+### 数据库（db/schema.sql）
+
+| 表 | 策略 |
+| --- | --- |
+| `user_state(owner_id PK DEFAULT auth.uid(), payload jsonb, updated_at, schema_version)` | RLS 4 策略，仅 `authenticated` 且 `owner_id = auth.uid()` |
+| `accounts(username PK, owner_id UNIQUE)` | Server-only：RLS 开 + 零策略 + 零 GRANT |
+| `account_secrets(username PK, email, pass_hash)` | 同上 |
+
+5 个 `SECURITY DEFINER` 函数：`fn_username_available` / `fn_login_email`（匿名可调）、
+`fn_register_account` / `fn_sync_password_hash` / `fn_get_username`（仅登录用户）。
+全部 `SET search_path = public, pg_temp`，EXECUTE 显式 GRANT（平台默认会给 `anon`，必须单独撤掉）。
 
 ## 扩展点
 
@@ -131,34 +146,44 @@ MVP 用 localStorage（零依赖，Capacitor 环境可用）。
 | 新知识点        | `core/knowledge.ts` 的 `KNOWLEDGE_ALIAS` / `KNOWLEDGE_DOMAIN` |
 | 换持久化        | 新增 `storage/` 实现，替换 store 中的调用                     |
 | 接后端 / 云同步 | 在 `storage/` 加远端仓储，`core/` 完全不动                    |
-| 新登录方式      | 在 `auth/supabaseAuth.ts` 加对应流程，`useAuthStore` 暴露入口 |
+| 新登录方式      | `src/cloud/` 接 SDK 流程 + `useAuthStore` 暴露动作；注意先解决「邮箱+口令」锚点问题 |
 | 新公式          | `data/formulas.ts`                                            |
 | 官方资讯源      | 替换 `data/news.ts` 的导出                                    |
 
 ## 分发
 
-三种交付形态，全部由 CI 自动产出：
+四种交付形态：
 
-| 形态       | 触发                                                    | 工作流                       | 产物                                |
-| ---------- | ------------------------------------------------------- | ---------------------------- | ----------------------------------- |
-| 在线版     | 推送 `master`                                           | `pages.yml` → GitHub Pages   | `https://<user>.github.io/cmc-lab/` |
-| 离线单文件 | 打 `v*` 标签                                            | `release.yml` → Release 附件 | `CMC-Lab-<版本>.html`（约 2 MB）    |
-| 原生 App   | 手动 `npx cap add android/ios` 后 `npm run cap:android` | —                            | Android Studio / Xcode 工程         |
+| 形态                  | 触发                                                      | 工作流                       | 产物                                | 云同步 |
+| --------------------- | --------------------------------------------------------- | ---------------------------- | ----------------------------------- | ------ |
+| **主在线版**          | 本地构建（有 `cloud.config.json`）后发布                   | —                            | `https://<自定义域名>`              | ✅     |
+| GitHub Pages（纯本地） | 推送 `master`                                             | `pages.yml` → GitHub Pages   | `https://<user>.github.io/cmc-lab/` | ❌     |
+| 离线单文件            | 打 `v*` 标签                                              | `release.yml` → Release 附件 | `CMC-Lab-<版本>.html`（约 2 MB）    | ❌     |
+| 原生 App              | 手动 `npx cap add android/ios` 后 `npm run cap:android`   | —                            | Android Studio / Xcode 工程         | ❌     |
 
-两个构建细节值得说明：
+**云同步的有无，取决于构建时能不能读到 `cloud.config.json`**（该文件 gitignore，仓库里只有
+`cloud.config.example.json`）。CI 上读不到 → 产物是纯本地版；单文件模式另外强制注入 `null`
+并用 vite alias 换掉整个云 SDK。
+
+三个构建细节值得说明：
 
 - **Pages 无需配置 base**：vite `base: './'` 产出相对路径，仓库页面在 `/cmc-lab/` 子路径下直接可用
 - **单文件模式的三个坑**（实现在 `vite.config.ts` 的插件里，注释详尽）：IIFE 经典脚本
   （`file://` 下 module 被 CORS 拦截）、转义字面量 `</script>`（否则 HTML 提前闭合脚本块）、
   脚本移到 `</body>` 前（`defer` 对内联脚本无效）
+- **云 SDK 的 alias 替换**：单文件版把 `@tencent-ai/workbuddy-cloud-sdk` 指向 `src/cloud/sdk-stub.ts`，
+  省约 75 KB；类型检查仍走真实包，所以类型安全不受影响
 
 ## 测试策略
 
-`npm test` 只测 `core/`（纯逻辑）+ 题库完整性：
+`npm test` 覆盖纯逻辑与数据契约，UI 不做快照测试（收益低、维护成本高），靠手工验证：
 
-- 判题等价性（含回归用例）
-- 题库解析：101 题、字段完整、往返一致
-- 组别模型：71 + 30 构成、A 类包含旧卷
-- 学习路径与评卷规则
+- `core/`：判题等价性（含回归用例）、题库解析（101 题、字段完整、往返一致）、
+  组别模型（71 + 30 构成、A 类包含旧卷）、学习路径与评卷规则、复习调度、报告生成
+- `storage/`：适配器选择（`file://` 强约束）、IndexedDB 首次迁移、备份往返、
+  LWW 合并、同步子集剥离内置题、防抖上传、`cloudBackend` 的写入形状与错误分流
+- `auth/`：用户名校验规则；登录/注册状态机的**请求契约**（先发码、验码时不重发、
+  用户名冲突就地提示、`isExistingUser` 分支、口令错不暴露账号是否存在）
 
-UI 不做快照测试（收益低、维护成本高），靠手工验证。
+云端的**权限边界**用 `npm run probe:cloud` 打真实数据面单独验（见 [CLOUD.md](./CLOUD.md)）；
+登录之后的链路必须在发布域名上人工走一遍 —— 本机 `localhost` 不在服务端 Origin 白名单里。

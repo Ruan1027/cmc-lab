@@ -1,0 +1,8 @@
+{
+  "_comment": "WorkBuddy 云服务公开配置模板。复制为 cloud.config.json 填写真实值（该文件已被 .gitignore 排除，不会进仓库）。四项都来自开通云服务时下发的 publicConfig —— 注意 endpoint 只接受下发的本应用发布域名，服务端按 Origin 精确匹配，本地 localhost 与预览域名一律会被拒绝。",
+  "_why": "publishableKey 只标识「哪个应用」、不携带权限，安全性由服务端 Origin 精确匹配提供；放前端是设计如此，但仍不要写进日志。",
+  "resourceId": "wbcs_xxxxxxxxxxxxxxxxxxxx",
+  "endpoint": "https://your-app.app.workbuddy.host",
+  "oauthRelayBaseUrl": "https://www.workbuddy.cn/v2/as/genie-baas/oauth",
+  "publishableKey": "wbpk_yourApplicationId_xxxxxxxxxxxxxxxxxxxx"
+}

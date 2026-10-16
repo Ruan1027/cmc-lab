@@ -9,6 +9,10 @@ import { defineConfig } from 'vitest/config';
  * 把缓存固定在项目内即可消除该不确定性。
  */
 export default defineConfig({
+  // 与 vite.config.ts 对齐：单测里不注入真实云配置（需要时由用例 mock cloud/cloudConfig）
+  define: {
+    __CMC_CLOUD_CONFIG__: 'null',
+  },
   test: {
     environment: 'node',
     include: ['src/**/*.test.ts'],

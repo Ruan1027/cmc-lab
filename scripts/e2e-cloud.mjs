@@ -1,33 +1,122 @@
-// 云同步后端冒烟探针（零依赖，Node >= 18 自带 fetch；无任何密钥，仅公开 publishable key）
-// 用途：从 GitHub Actions 等外部网络验证 Supabase 项目可达、表存在且 RLS 生效。
-//      本机网络对 *.supabase.co 有 TLS 干扰时，本地跑不了，由 CI 代跑。
-const URL_BASE = 'https://evwgvdozjterzgguztan.supabase.co';
-const PUB = 'sb_publishable_vT8pkbYic6b_idDSIMQ-Jg_YRLe6Ut-';
+/**
+ * 云服务数据面冒烟探针（零依赖，Node >= 18 自带 fetch）
+ *
+ * 用**公开** publishable key 打真实数据面，逐条验证「匿名该通的通、该拒的拒」。
+ * 只需要 cloud.config.json（或环境变量 CMC_CLOUD_ENDPOINT / CMC_CLOUD_KEY），
+ * 不需要任何账号、不发验证码、不写业务数据。
+ *
+ * 用法：
+ *   node scripts/e2e-cloud.mjs
+ *   CMC_CLOUD_ENDPOINT=https://x.app.workbuddy.host CMC_CLOUD_KEY=wbpk_... node scripts/e2e-cloud.mjs
+ *
+ * 能验的：域名可达、publishable key 被接受、匿名可调的函数存在且行为正确、
+ *         三个受保护对象（accounts / account_secrets / user_state）对匿名全拒。
+ * 不能验的：登录后的路径 —— 那条链路必须有真会话，只能由真人在发布域名上走一遍。
+ */
+import fs from 'node:fs';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
+
+const here = path.dirname(fileURLToPath(import.meta.url));
+
+function loadConfig() {
+  const envEndpoint = process.env.CMC_CLOUD_ENDPOINT;
+  const envKey = process.env.CMC_CLOUD_KEY;
+  if (envEndpoint && envKey) {
+    return { endpoint: String(envEndpoint).replace(/\/+$/, ''), publishableKey: envKey };
+  }
+  const file = path.resolve(here, '../cloud.config.json');
+  if (!fs.existsSync(file)) {
+    console.error('找不到 cloud.config.json，也没有 CMC_CLOUD_ENDPOINT / CMC_CLOUD_KEY 环境变量');
+    process.exit(2);
+  }
+  const raw = JSON.parse(fs.readFileSync(file, 'utf8'));
+  return { endpoint: String(raw.endpoint).replace(/\/+$/, ''), publishableKey: String(raw.publishableKey) };
+}
+
+const cfg = loadConfig();
+const base = `${cfg.endpoint}/.cloud/database/rest`;
+const headers = {
+  'x-wb-webapp-access-key': cfg.publishableKey,
+  'Content-Type': 'application/json',
+  // 服务端按 Origin 精确匹配放行，这里模拟真实浏览器来源
+  Origin: cfg.endpoint,
+};
 
 let ok = true;
 function check(name, cond, detail = '') {
-  console.log(`${cond ? 'PASS' : 'FAIL'} ${name}${detail ? '  | ' + detail : ''}`);
+  console.log(`${cond ? 'PASS' : 'FAIL'} ${name}${detail ? `  | ${detail}` : ''}`);
   if (!cond) ok = false;
 }
 
-const h = await fetch(`${URL_BASE}/auth/v1/health`, { headers: { apikey: PUB } });
-check('auth /health 200', h.status === 200, `HTTP ${h.status} ${await h.text()}`);
+async function call(method, url, body) {
+  const res = await fetch(url, {
+    method,
+    headers,
+    body: body === undefined ? undefined : JSON.stringify(body),
+  });
+  const text = await res.text();
+  let json = null;
+  try {
+    json = JSON.parse(text);
+  } catch {
+    /* 非 JSON 响应 */
+  }
+  return { status: res.status, text, json };
+}
 
-const r = await fetch(`${URL_BASE}/rest/v1/user_state?select=user_id`, {
-  headers: { apikey: PUB },
+// ---------- 匿名该通的 ----------
+const rpcAvailable = await call('POST', `${base}/rpc/fn_username_available`, {
+  p_username: 'probe_user_xyz',
 });
-const rows = await r.json().catch(() => null);
-check('PostgREST 匿名请求 200', r.status === 200, `HTTP ${r.status}`);
-check('RLS 拦截匿名读取（返回空数组）', Array.isArray(rows) && rows.length === 0, JSON.stringify(rows));
-
-// GitHub OAuth 提供方已启用：/authorize 应 302 跳 github.com 且带我们的 client_id
-const a = await fetch(
-  `${URL_BASE}/auth/v1/authorize?provider=github&redirect_to=${encodeURIComponent('https://ruan1027.github.io/cmc-lab/')}`,
-  { headers: { apikey: PUB }, redirect: 'manual' },
+check(
+  '匿名可调 fn_username_available → true',
+  rpcAvailable.status === 200 && rpcAvailable.json === true,
+  `HTTP ${rpcAvailable.status} ${rpcAvailable.text.slice(0, 80)}`,
 );
-const loc = a.headers.get('location') || '';
-check('GitHub 登录入口 302 → github.com', a.status === 302 && loc.includes('github.com/login/oauth/authorize'), `HTTP ${a.status} ${loc.slice(0, 90)}`);
-check('回调携带我们的 client_id', loc.includes('client_id=Ov23liHWUAiJj6pNkhYe'), loc ? loc.slice(0, 160) : 'no location');
+
+const rpcBadName = await call('POST', `${base}/rpc/fn_username_available`, { p_username: 'a' });
+check(
+  '非法用户名 → false（函数自带格式校验）',
+  rpcBadName.status === 200 && rpcBadName.json === false,
+  `HTTP ${rpcBadName.status} ${rpcBadName.text.slice(0, 80)}`,
+);
+
+const rpcLogin = await call('POST', `${base}/rpc/fn_login_email`, {
+  p_username: 'nobody_should_exist_xyz',
+  p_password: 'definitely-wrong',
+});
+check(
+  '匿名 fn_login_email 口令不对 → null（不泄露用户名是否存在）',
+  rpcLogin.status === 200 && rpcLogin.json === null,
+  `HTTP ${rpcLogin.status} ${rpcLogin.text.slice(0, 80)}`,
+);
+
+// ---------- 匿名该拒的 ----------
+const denied = [
+  [
+    'fn_register_account（仅登录用户可调）',
+    'POST',
+    `${base}/rpc/fn_register_account`,
+    { p_username: 'x_1', p_email: 'a@b.com', p_password: '123456' },
+  ],
+  ['fn_get_username（仅登录用户可调）', 'POST', `${base}/rpc/fn_get_username`, {}],
+  ['fn_sync_password_hash（仅登录用户可调）', 'POST', `${base}/rpc/fn_sync_password_hash`, { p_password: '123456' }],
+  ['读 user_state', 'GET', `${base}/user_state?select=owner_id`, undefined],
+  ['写 user_state', 'POST', `${base}/user_state`, { payload: {} }],
+  ['读 accounts', 'GET', `${base}/accounts?select=username`, undefined],
+  ['读 account_secrets', 'GET', `${base}/account_secrets?select=email`, undefined],
+];
+
+for (const [name, method, url, body] of denied) {
+  const r = await call(method, url, body);
+  const code = r.json?.code ?? '';
+  check(
+    `匿名被拒：${name}`,
+    r.status >= 400 && String(code).includes('42501'),
+    `HTTP ${r.status} ${r.text.slice(0, 80)}`,
+  );
+}
 
 console.log(ok ? '\nRESULT: ALL PASS' : '\nRESULT: HAS FAILURES');
 process.exit(ok ? 0 : 1);

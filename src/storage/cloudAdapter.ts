@@ -42,7 +42,7 @@ function writeMeta(m: SyncMeta): void {
 
 export interface CloudDeps {
   local: StorageAdapter;
-  /** 为 null 时（未配置 Supabase）整个适配器退化为纯本地 */
+  /** 为 null 时（未接入云服务）整个适配器退化为纯本地 */
   remote: RemoteBackend | null;
   getUserId: () => string | null;
   debounceMs?: number;
@@ -88,9 +88,12 @@ export class CloudAdapter implements StorageAdapter {
         useAuthStore.getState().setSync('synced', ts);
       }
       return state;
-    } catch {
-      useAuthStore.getState().setSync('offline');
-      return localState; // 网络错误 → 退回本地
+    } catch (e) {
+      // 「被拒」是身份/权限问题（要重新登录），不是网络问题：两者要分开显示，
+      // 否则用户会以为是网络抖动而在原地等重试
+      const denied = e instanceof Error && /被拒绝/.test(e.message);
+      useAuthStore.getState().setSync(denied ? 'error' : 'offline');
+      return localState; // 退回本地
     }
   }
 

@@ -2,6 +2,60 @@
 
 本项目遵循 [Semantic Versioning](https://semver.org/)，格式参考 [Keep a Changelog](https://keepachangelog.com/)。
 
+## [2.1.0] - 2026-10-16
+
+**换后端 + 重做账号模型**：Supabase 从国内访问不通（`*.supabase.co` 按域名 TLS 握手被重置，实测同 IP 段的 `api.supabase.com` 正常），在线版对国内用户等于不可用；改用 WorkBuddy 云服务（数据面与应用同源，国内可达），同时把登录方式改成「用户名 / 邮箱 + 密码」。
+
+### 变更（Breaking）
+
+- **后端：Supabase → WorkBuddy 云服务**。数据面走同源 `/.cloud/**`，不再依赖任何第三方域名
+- **账号模型重做**：不再支持 GitHub OAuth / 手机号短信。
+
+  | | v2.0.0 | v2.1.0 |
+  | --- | --- | --- |
+  | 注册 | 邮箱 / 手机号验证码，无密码 | 用户名 + 邮箱 → 验证码 → 密码 |
+  | 登录 | GitHub OAuth / 邮箱 OTP / 短信 OTP | 用户名 **或** 邮箱 + 密码 |
+  | 用户名校验 | 无 | 全站唯一（大小写不敏感），冲突提示「该用户名已存在，请重新设置」 |
+
+  > 平台不支持用户名登录，也没有「未经验证的密码注册」。因此**平台身份 = 邮箱**，
+  > 用户名是应用层的一层字典（`accounts` 表），登录时先用用户名换回邮箱再走平台密码登录。
+  > 因为旧账号（若有）无法迁移到新平台，2.0.0 的云端数据不再关联；本地数据不受影响，
+  > 登录后可用「上传本地数据到云端（合并）」重新推上去。
+
+### 新增
+
+- **`src/cloud/`**：`cloudConfig.ts`（公开配置读取 + 环境判断）、`sdk.ts`（SDK 单例）、
+  `sdk-stub.ts`（单文件构建时替换掉整个 SDK，省约 75 KB）
+- **`src/storage/cloudBackend.ts`**：`RemoteBackend` 的云服务实现，走 SDK 的 `cloud.database`
+- **`src/auth/username.ts`**：用户名校验规则（与数据库侧同名正则，前后端必须一致）
+- **`db/schema.sql`**：三张表 + RLS + 5 个 `SECURITY DEFINER` 函数的权威记录
+- **`cloud.config.example.json`**：云配置模板；真实 `cloud.config.json` 已 gitignore
+- **`scripts/e2e-cloud.mjs` + `npm run probe:cloud`**：零依赖数据面探针，验证「匿名该通的通、该拒的拒」（本机即可跑）
+- **口令闸门**：`fn_login_email` 只有口令正确才返回邮箱，避免匿名调用者拿用户名批量枚举邮箱
+- **忘记密码**：邮箱 + 验证码 + 新密码，重置后自动同步用户名登录用的口令散列
+- **退出登录前先 flush** 待推送改动，避免最后几秒的操作丢失
+- `docs/CLOUD.md`：云同步设计、自建后端步骤、自动化验证边界
+
+### 修复
+
+- **匿名可写 `user_state`**：平台给匿名请求的 `auth.uid()` 返回字面量 `'anon'`（不是 NULL），
+  若给 `anon` 授予 INSERT 权限，所有未登录访客会共用 `owner_id = 'anon'` 这一行。
+  已改为只授权 `authenticated`，并 `REVOKE ALL` 掉平台默认授予 `anon` / `authenticated` 的权限
+  （`accounts` / `account_secrets` 因此成为名副其实的 Server-only）
+- 云端同步被拒（42501）与网络离线现在分开显示：「同步失败」而不是「离线」—— 前者要重新登录，后者只需等网络
+
+### 移除
+
+- `src/storage/{supabaseConfig,supabaseBackend}.ts`、`src/auth/supabaseAuth.ts`、`supabase/`、`.env.example`
+- `.github/workflows/e2e-cloud.yml`：原为绕开本机对 `*.supabase.co` 的 TLS 干扰而设，现在数据面本机可达，改成本地 `npm run probe:cloud`
+
+### 测试
+
+- 新增 `src/auth/__tests__/useAuthStore.test.ts`（14 项）：把「先发码、验码时不重发」这条契约钉死，
+  覆盖用户名冲突、`isExistingUser` 分支、用户名换邮箱、建号后登记用户名失败仍保持登录、口令错误不暴露账号是否存在
+- 新增 `src/auth/__tests__/username.test.ts`（5 项）、`createCloudBackend` 的 7 项（写入不带 `owner_id`、删除先读 owner 再删、权限错误可识别）
+- 全量：typecheck 0 / lint 0 / `npm test` 115 项通过 / 生产构建 + 单文件构建均通过
+
 ## [2.0.0] - 2026-10-15
 
 多端云同步：登录账号后学习数据跨设备自动同步，换设备 / 清缓存不再丢进度。路线图最后一项完成。

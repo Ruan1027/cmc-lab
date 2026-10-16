@@ -1,6 +1,6 @@
 {
   "name": "cmc-lab",
-  "version": "2.0.0",
+  "version": "2.1.0",
   "private": false,
   "description": "全国大学生数学竞赛（CMC）备考助手：真题练习、限时模考、错题复盘、知识模块追踪、公式速查",
   "license": "MIT",
@@ -26,12 +26,14 @@
     "test:watch": "vitest",
     "lint": "eslint .",
     "validate": "node scripts/validate-bank.cjs",
+    "probe:cloud": "node scripts/e2e-cloud.mjs",
     "format": "prettier --write .",
     "cap:sync": "vite build && cap sync",
     "cap:android": "vite build && cap sync android && cap open android",
     "cap:ios": "vite build && cap sync ios && cap open ios"
   },
   "dependencies": {
+    "@tencent-ai/workbuddy-cloud-sdk": "dev",
     "katex": "^0.16.11",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",

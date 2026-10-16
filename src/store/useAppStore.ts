@@ -147,6 +147,8 @@ interface Actions {
   resetAll: () => void;
   /** 老用户迁移：把当前本地数据立即上传到云端 */
   uploadLocalData: () => void;
+  /** 把待推送的改动立刻刷上云端（退出登录 / 关页面前调用，避免丢最后一次改动） */
+  flushCloud: () => Promise<void>;
 }
 
 export interface AppState extends Omit<PersistedState, 'practice'> {
@@ -389,6 +391,16 @@ export const useAppStore = create<AppState & Actions>()((set, get) => {
       };
       void a.uploadCurrent(snapshot);
       get().notify('已把本地数据上传到云端');
+    },
+
+    flushCloud: async () => {
+      const a = getCloudAdapter();
+      if (!a) return;
+      try {
+        await a.flush();
+      } catch {
+        /* 忽略：离线时保留待推送内容，下次联网自动补推 */
+      }
     },
   };
 });
