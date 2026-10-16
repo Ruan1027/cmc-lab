@@ -2,85 +2,75 @@
 
 本项目遵循 [Semantic Versioning](https://semver.org/)，格式参考 [Keep a Changelog](https://keepachangelog.com/)。
 
-## [2.1.0] - 2026-10-16
-
-**换后端 + 重做账号模型**：Supabase 从国内访问不通（`*.supabase.co` 按域名 TLS 握手被重置，实测同 IP 段的 `api.supabase.com` 正常），在线版对国内用户等于不可用；改用 WorkBuddy 云服务（数据面与应用同源，国内可达），同时把登录方式改成「用户名 / 邮箱 + 密码」。
-
-### 变更（Breaking）
-
-- **后端：Supabase → WorkBuddy 云服务**。数据面走同源 `/.cloud/**`，不再依赖任何第三方域名
-- **账号模型重做**：不再支持 GitHub OAuth / 手机号短信。
-
-  | | v2.0.0 | v2.1.0 |
-  | --- | --- | --- |
-  | 注册 | 邮箱 / 手机号验证码，无密码 | 用户名 + 邮箱 → 验证码 → 密码 |
-  | 登录 | GitHub OAuth / 邮箱 OTP / 短信 OTP | 用户名 **或** 邮箱 + 密码 |
-  | 用户名校验 | 无 | 全站唯一（大小写不敏感），冲突提示「该用户名已存在，请重新设置」 |
-
-  > 平台不支持用户名登录，也没有「未经验证的密码注册」。因此**平台身份 = 邮箱**，
-  > 用户名是应用层的一层字典（`accounts` 表），登录时先用用户名换回邮箱再走平台密码登录。
-  > 因为旧账号（若有）无法迁移到新平台，2.0.0 的云端数据不再关联；本地数据不受影响，
-  > 登录后可用「上传本地数据到云端（合并）」重新推上去。
-
-### 新增
-
-- **`src/cloud/`**：`cloudConfig.ts`（公开配置读取 + 环境判断）、`sdk.ts`（SDK 单例）、
-  `sdk-stub.ts`（单文件构建时替换掉整个 SDK，省约 75 KB）
-- **`src/storage/cloudBackend.ts`**：`RemoteBackend` 的云服务实现，走 SDK 的 `cloud.database`
-- **`src/auth/username.ts`**：用户名校验规则（与数据库侧同名正则，前后端必须一致）
-- **`db/schema.sql`**：三张表 + RLS + 5 个 `SECURITY DEFINER` 函数的权威记录
-- **`cloud.config.example.json`**：云配置模板；真实 `cloud.config.json` 已 gitignore
-- **`scripts/e2e-cloud.mjs` + `npm run probe:cloud`**：零依赖数据面探针，验证「匿名该通的通、该拒的拒」（本机即可跑）
-- **口令闸门**：`fn_login_email` 只有口令正确才返回邮箱，避免匿名调用者拿用户名批量枚举邮箱
-- **忘记密码**：邮箱 + 验证码 + 新密码，重置后自动同步用户名登录用的口令散列
-- **退出登录前先 flush** 待推送改动，避免最后几秒的操作丢失
-- `docs/CLOUD.md`：云同步设计、自建后端步骤、自动化验证边界
-
-### 修复
-
-- **匿名可写 `user_state`**：平台给匿名请求的 `auth.uid()` 返回字面量 `'anon'`（不是 NULL），
-  若给 `anon` 授予 INSERT 权限，所有未登录访客会共用 `owner_id = 'anon'` 这一行。
-  已改为只授权 `authenticated`，并 `REVOKE ALL` 掉平台默认授予 `anon` / `authenticated` 的权限
-  （`accounts` / `account_secrets` 因此成为名副其实的 Server-only）
-- 云端同步被拒（42501）与网络离线现在分开显示：「同步失败」而不是「离线」—— 前者要重新登录，后者只需等网络
-
-### 移除
-
-- `src/storage/{supabaseConfig,supabaseBackend}.ts`、`src/auth/supabaseAuth.ts`、`supabase/`、`.env.example`
-- `.github/workflows/e2e-cloud.yml`：原为绕开本机对 `*.supabase.co` 的 TLS 干扰而设，现在数据面本机可达，改成本地 `npm run probe:cloud`
-
-### 测试
-
-- 新增 `src/auth/__tests__/useAuthStore.test.ts`（14 项）：把「先发码、验码时不重发」这条契约钉死，
-  覆盖用户名冲突、`isExistingUser` 分支、用户名换邮箱、建号后登记用户名失败仍保持登录、口令错误不暴露账号是否存在
-- 新增 `src/auth/__tests__/username.test.ts`（5 项）、`createCloudBackend` 的 7 项（写入不带 `owner_id`、删除先读 owner 再删、权限错误可识别）
-- 全量：typecheck 0 / lint 0 / `npm test` 115 项通过 / 生产构建 + 单文件构建均通过
-
-## [2.0.0] - 2026-10-15
+## [2.0.0] - 2026-10-16
 
 多端云同步：登录账号后学习数据跨设备自动同步，换设备 / 清缓存不再丢进度。路线图最后一项完成。
 
 ### 新增
 
-- **账号体系与云同步**：右上角「账号」按钮 + 顶部同步状态指示；登录后 `CloudAdapter` 包装本地适配器自动推拉，未配置 / 未登录 / 离线时退化为纯本地，业务代码零改动
-- **三种登录方式（第一阶段）**：GitHub OAuth（PKCE 重定向 + code 兑换 token）、邮箱验证码 OTP、手机号短信验证码 OTP
-- **同步子集（SyncedPayload）**：仅 `{wrongBook, stats, history, exams, settings, flags, importedProblems}`，**内置 101 题永远本地重建、不同步**，避免冗余上传与多端互相覆盖
-- **零依赖 Supabase 直连**：原生 `fetch` 接 PostgREST + REST Auth（因官方 SDK 在本机构建环境装不上 `@supabase/functions-js`，改用直连更契合「少依赖」取向）；仅一个 `user_state` 表 + RLS 行级权限（`auth.uid() = user_id`）
+- **账号体系与云同步**：右上角「账号」按钮 + 顶部同步状态指示；登录后 `CloudAdapter` 包装本地适配器自动推拉，
+  未配置 / 未登录 / 离线时退化为纯本地，业务代码零改动；退出登录前先 flush 待推送改动，避免最后几秒的操作丢失
+- **注册 / 登录**：注册 = 用户名 + 邮箱 → 收验证码 → 设密码 → 建号；登录 = 用户名 **或** 邮箱 + 密码；
+  忘记密码 = 邮箱 + 验证码 + 新密码
+- **用户名全站唯一**（大小写不敏感），冲突提示「该用户名已存在，请重新设置」；2–20 位中文 / 字母 / 数字 / 下划线
+- **口令闸门**：用户名必须先经服务端口令校验才换回邮箱（`fn_login_email`），
+  避免匿名调用者拿用户名批量枚举邮箱；口令不对返回 `null`，无法区分「用户名不存在」与「密码错」
+- **同步子集（SyncedPayload）**：仅 `{wrongBook, stats, history, exams, settings, flags, importedProblems}`，
+  **内置 101 题永远本地重建、不同步**，避免冗余上传与多端互相覆盖
 - **LWW 合并**：云端 `updated_at` 晚于本地 `lastSyncAt` 才采用，防把旧数据写回云端
-- **老用户迁移**：已登录用户可一键「上传本地数据到云端」，把升级前的本地进度首次推上去
-- **`supabase/migrations/0001_user_state.sql`**：建表 + 4 条 RLS 策略
-- **`.env.example`**：标注 `VITE_SUPABASE_URL` / `VITE_SUPABASE_ANON_KEY`；单文件构建不读取
-- **微信 / QQ / 平台生成账号 UID 登录**按计划放第二阶段，本期未实现（UI 已预留入口）
+- **老用户迁移**：一键「上传本地数据到云端（合并）」，把升级前的本地进度首次推上去
+- **`src/cloud/`**：`cloudConfig.ts`（公开配置读取 + 环境判断）、`sdk.ts`（SDK 单例）、
+  `sdk-stub.ts`（纯本地构建时替换掉整个 SDK）
+- **`src/storage/cloudBackend.ts`**：`RemoteBackend` 的云服务实现，走 SDK 的 `cloud.database`
+- **`src/auth/username.ts`**：用户名校验规则（与数据库侧同名正则，前后端必须一致）
+- **`db/schema.sql`**：三张表 + RLS + 5 个 `SECURITY DEFINER` 函数的权威记录
+- **`cloud.config.example.json`**：云配置模板；真实 `cloud.config.json` 已 gitignore，仓库里没有任何后端地址
+- **`scripts/e2e-cloud.mjs` + `npm run probe:cloud`**：零依赖数据面探针，验证「匿名该通的通、该拒的拒」，本机即可跑
+- `docs/CLOUD.md`：云同步设计、自建后端步骤、自动化验证边界
+
+### 后端选型
+
+最初一版实现用的是 Supabase，**从国内访问不通**：`*.supabase.co` 的 DNS 正常、TCP 能连，
+但 TLS 握手被重置（同 IP 段的 `api.supabase.com` 正常）—— 按域名（SNI）封锁，在线版对国内用户等于不可用。
+最终改用 **WorkBuddy 云服务**：数据面与应用**同源**（都走 `/.cloud/**`，域名就是发布域名），国内可达，
+并且省掉了自建数据库与邮件验证码这一整块运维。
+
+### 安全
+
+- 三张表全部开启行级权限（RLS）：`user_state` 只允许 `authenticated` 读写自己那一行；
+  `accounts` / `account_secrets` 是 **Server-only**（开 RLS + 零策略 + 零 GRANT），只能经服务端函数访问
+- 平台会给新建的表和函数**默认授予 `anon` 权限**，所以 Server-only 必须显式 `REVOKE`，
+  函数还要单独 `REVOKE EXECUTE ... FROM anon`（只 `REVOKE FROM PUBLIC` 撤不掉那个显式授予）
+- **匿名请求的 `auth.uid()` 返回字面量 `'anon'`（不是 NULL）**：给 `user_state` 授予 anon 的 INSERT 后，
+  匿名 POST 真能建出 `owner_id = 'anon'` 的行 —— 所有未登录访客共用一行。已改为只授权 `authenticated`
+- 口令在服务端存 bcrypt 散列（`pgcrypto`），前端不接触、不落盘；
+  平台侧与 `account_secrets.pass_hash` 两份散列必须同步，改密后要调 `fn_sync_password_hash`
+- 云端同步被拒（42501）与网络离线分开显示：「同步失败」而不是「离线」—— 前者要重新登录，后者只需等网络
 
 ### 架构
 
-- 存储层 `StorageAdapter` 接口新增 `CloudAdapter` 实现；`selectAdapter` 在在线环境且存在 Supabase 配置时自动包一层云端适配
-- 新增 `src/storage/{supabaseConfig,remote,supabaseBackend,cloudAdapter}.ts` 与 `src/auth/{supabaseAuth,useAuthStore}.ts`，全部走可 mock 的纯函数，便于单测
+- 存储层 `StorageAdapter` 接口新增 `CloudAdapter` 实现；`selectAdapter` 在在线环境且**构建期注入了云配置**时自动包一层云端适配
+- 三种交付形态由「有没有 `cloud.config.json`」决定：主在线版（带云同步）/
+  GitHub Pages 与 fork 构建（纯本地，且不打包云 SDK）/ Release 单文件（纯本地离线匿名）
+- 新增 `src/cloud/`、`src/storage/{remote,cloudBackend,cloudAdapter}.ts`、`src/auth/{username,useAuthStore}.ts`，
+  全部走可 mock 的纯函数，便于单测
+- 数据库：`user_state(owner_id PK DEFAULT auth.uid(), payload jsonb, updated_at, schema_version)` + 4 条 RLS 策略；
+  账号相关的 5 个函数全部 `SECURITY DEFINER` 且钉死 `search_path`
+
+### 未做
+
+- **微信 / QQ / WorkBuddy 账号登录**：这类账号没有「邮箱 + 口令」这个锚点 —— 既没有密码可同步，
+  也可能没有邮箱。硬塞进来会让「用户名 + 密码」这条链路直接断掉，需要另设计一套账号绑定流程，留待后续
 
 ### 测试
 
-- 新增 10 项云同步单测（`src/storage/__tests__/cloudAdapter.test.ts`）：子集剥离、LWW 新旧判定、未登录不触网、云端更新写回、出错退离线、防抖上传、clear 双清、Supabase 端点 mock
-- 全量：typecheck 0 / lint 0 / `npm test` 89 项通过 / 生产构建 + 单文件构建均通过，单文件 `modulepreload`=0（约 2 MB 可 `file://` 运行）
+- `src/auth/__tests__/useAuthStore.test.ts`（14 项）：把「先发码、验码时不重发」这条契约钉死，
+  覆盖用户名冲突、`isExistingUser` 分支、用户名换邮箱、建号后登记用户名失败仍保持登录、口令错误不暴露账号是否存在
+- `src/auth/__tests__/username.test.ts`（5 项）：锁死与前端的共享规则
+- `cloudAdapter.test.ts` 扩到 16 项：新增 `createCloudBackend` 的 7 项（写入不带 `owner_id`、
+  删除先读 owner 再删、权限错误可识别）
+- 全量：typecheck 0 / lint 0 / `npm test` 115 项通过 / 生产构建 + 单文件构建均通过，
+  单文件 jsdom 真跑（101 题 + 43 处公式）/ `npm run probe:cloud` 对真实数据面 10 项全 PASS
 
 ## [1.6.0] - 2026-10-15
 

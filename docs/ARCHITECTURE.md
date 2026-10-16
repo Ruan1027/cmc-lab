@@ -86,7 +86,7 @@ SuperMemo SM-2 简化版（Anki 早期同源），纯函数：
 MVP 用 localStorage（零依赖，Capacitor 环境可用）。
 已抽象为接口，题库规模上去后换 IndexedDB 即可，上层无需改动。
 
-## 多端云同步（v2.1.0）
+## 多端云同步（v2.0.0）
 
 完整设计（账号模型、权限边界、自建后端、验证边界）见 [CLOUD.md](./CLOUD.md)。
 
