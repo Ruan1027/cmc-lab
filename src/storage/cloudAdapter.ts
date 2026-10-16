@@ -13,9 +13,11 @@
 import type { StorageAdapter } from './types';
 import { emptyState, type PersistedState } from './repository';
 import {
+  buildBuiltinIndex,
   fingerprintPayload,
   mergeLWW,
   toSyncedPayload,
+  type BuiltinIndex,
   type RemoteBackend,
   type SyncedPayload,
 } from './remote';
@@ -72,7 +74,7 @@ export class CloudAdapter implements StorageAdapter {
   private remote: RemoteBackend | null;
   private getUserId: () => string | null;
   private debounceMs: number;
-  private builtinIds: Set<string>;
+  private builtinIndex: BuiltinIndex;
   private builtinProblems: Problem[];
   private timer: ReturnType<typeof setTimeout> | null = null;
   private pending: SyncedPayload | null = null;
@@ -88,7 +90,7 @@ export class CloudAdapter implements StorageAdapter {
     this.getUserId = deps.getUserId;
     this.debounceMs = deps.debounceMs ?? 1500;
     const builtin = loadBuiltinProblems();
-    this.builtinIds = new Set(builtin.map((p) => p.id));
+    this.builtinIndex = buildBuiltinIndex(builtin);
     this.builtinProblems = builtin;
     if (typeof window !== 'undefined') {
       window.addEventListener('visibilitychange', () => {
@@ -103,7 +105,7 @@ export class CloudAdapter implements StorageAdapter {
     if (!userId || !this.remote) return localState; // 未登录 / 未配置 → 纯本地
 
     // 本机当前的同步子集：①③ 两个分支都要用它，先算一次
-    const localPayload = toSyncedPayload(localState ?? emptyState(), this.builtinIds);
+    const localPayload = toSyncedPayload(localState ?? emptyState(), this.builtinIndex);
     this.seededOnLastLoad = false;
     try {
       const remote = await this.remote.load(userId);
@@ -132,7 +134,7 @@ export class CloudAdapter implements StorageAdapter {
         writeMeta({
           ...meta,
           lastSyncAt: ts,
-          lastRemoteHash: fingerprintPayload(toSyncedPayload(state, this.builtinIds)),
+          lastRemoteHash: fingerprintPayload(toSyncedPayload(state, this.builtinIndex)),
         });
         useAuthStore.getState().setSync('synced', ts);
         return state;
@@ -158,7 +160,7 @@ export class CloudAdapter implements StorageAdapter {
     const ok = await this.local.save(state);
     const userId = this.getUserId();
     if (!userId || !this.remote) return ok; // 未登录 / 未配置 → 不推送
-    this.schedulePush(toSyncedPayload(state, this.builtinIds));
+    this.schedulePush(toSyncedPayload(state, this.builtinIndex));
     return ok;
   }
 
@@ -182,7 +184,7 @@ export class CloudAdapter implements StorageAdapter {
 
   /** 把当前完整状态立即上传（老用户迁移：把本地数据推到云端） */
   async uploadCurrent(state: PersistedState): Promise<void> {
-    await this.pushNow(toSyncedPayload(state, this.builtinIds));
+    await this.pushNow(toSyncedPayload(state, this.builtinIndex));
   }
 
   /** 把一次推送真正发出去；返回是否成功（失败会保留待推送内容，5s 后重试） */

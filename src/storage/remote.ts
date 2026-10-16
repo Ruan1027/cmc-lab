@@ -33,8 +33,32 @@ export interface RemoteBackend {
   clear(userId: string): Promise<void>;
 }
 
+/**
+ * 内置题的「身份」索引：id 与来源标题**两者都用**。
+ *
+ * 为什么不用单一依据：id 曾经因为解析时用随机数而在每个会话漂移，结果内置题剥离
+ * 全面失效、被当成用户导入题整批同步（题库翻倍）。现在 id 已是确定性值，
+ * 但 source 作为第二道闸门留着 —— 判重的代价极低，而漏判的后果是用户数据被污染。
+ */
+export interface BuiltinIndex {
+  ids: Set<string>;
+  sources: Set<string>;
+}
+
+export function buildBuiltinIndex(builtin: Problem[]): BuiltinIndex {
+  return {
+    ids: new Set(builtin.map((p) => p.id)),
+    sources: new Set(builtin.map((p) => p.source)),
+  };
+}
+
+/** 这道题是不是内置题（id 命中或来源标题命中） */
+export function isBuiltinProblem(p: Problem, index: BuiltinIndex): boolean {
+  return index.ids.has(p.id) || index.sources.has(p.source);
+}
+
 /** 从完整状态中剥离出同步子集（去掉内置题） */
-export function toSyncedPayload(state: PersistedState, builtinIds: Set<string>): SyncedPayload {
+export function toSyncedPayload(state: PersistedState, builtin: BuiltinIndex): SyncedPayload {
   return {
     version: state.version,
     wrongBook: state.wrongBook,
@@ -43,7 +67,7 @@ export function toSyncedPayload(state: PersistedState, builtinIds: Set<string>):
     exams: state.exams,
     settings: state.settings,
     flags: state.flags,
-    importedProblems: state.problems.filter((p) => !builtinIds.has(p.id)),
+    importedProblems: state.problems.filter((p) => !isBuiltinProblem(p, builtin)),
   };
 }
 
@@ -54,8 +78,10 @@ export function applyPayload(
   builtin: Problem[],
 ): PersistedState {
   const base = local ?? emptyState();
-  const seen = new Set(builtin.map((p) => p.id));
-  const imported = (payload.importedProblems ?? []).filter((p) => !seen.has(p.id));
+  const index = buildBuiltinIndex(builtin);
+  // 云端 payload 里可能混着内置题（旧版本的 id 漂移留下的脏数据），这里一并滤掉，
+  // 否则合并后题库会翻倍
+  const imported = (payload.importedProblems ?? []).filter((p) => !isBuiltinProblem(p, index));
   return {
     ...base,
     version: payload.version,

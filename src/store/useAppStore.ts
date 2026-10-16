@@ -20,6 +20,7 @@ import {
   emptyState,
   exportBackup,
   parseBackup,
+  reconcileBuiltins,
   type PersistedState,
   type PracticeSnapshot,
 } from '../storage/repository';
@@ -203,8 +204,12 @@ export const useAppStore = create<AppState & Actions>()((set, get) => {
 
     hydrate: async () => {
       const saved = await getAdapter().load();
-      const base = saved ?? emptyState();
-      const problems = base.problems.length ? base.problems : loadBuiltinProblems();
+      const builtin = loadBuiltinProblems();
+      // 老版本的题目 id 是随机的，每次开页面都变 → 先按来源标题对齐一次。
+      // 不对齐的话错题本 / 标记 / 练习历史全部指向不存在的题号（见 reconcileBuiltins）
+      const fixed = saved ? reconcileBuiltins(saved, builtin) : null;
+      const base = fixed ? fixed.state : emptyState();
+      const problems = base.problems.length ? base.problems : builtin;
       const { practice, ...persisted } = base;
       set({
         ...persisted,
@@ -218,7 +223,8 @@ export const useAppStore = create<AppState & Actions>()((set, get) => {
           resumed: !!practice?.queue?.length,
         },
       });
-      if (!base.problems.length) persist();
+      // 对齐过就写回本地；已登录时 persist 还会把干净数据推上云端，顺手把云端脏数据覆盖掉
+      if (!base.problems.length || fixed?.changed) persist();
       // 首次登录时 CloudAdapter 会把本机数据作为「种子」推上云端 —— 明确告诉用户一句，
       // 否则「到底同步了没有」只能靠猜（这正是之前必须手动点上传的根因）
       if (getCloudAdapter()?.seededOnLastLoad) get().notify('本机进度已自动同步到云端');

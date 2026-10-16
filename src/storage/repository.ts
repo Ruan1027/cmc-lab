@@ -109,3 +109,62 @@ export function parseBackup(text: string): PersistedState {
   if (!Array.isArray(obj.problems)) throw new Error('备份格式不对：缺少 problems 字段');
   return normalizeState(obj);
 }
+
+/**
+ * 一次性数据修复：把本地存的内置题对齐到当前代码包里的版本，并重映射「以题目 id 为键」的数据。
+ *
+ * 为什么需要：早期版本的题目 id 由 `uid()`（时间戳 + 随机）生成，而内置题库**每次打开
+ * 页面都会重新解析** —— 同一道题在每个会话里 id 都不同。后果有三重：
+ *   1. 错题本 / 标记 / 练习历史 / 模考明细全部以 id 为键，刷新一次就全部对不上号
+ *      （表现为「刚做的题、刚设的进度，重开就没了」）
+ *   2. 同步时内置题剥离不掉，被当成「用户导入题」整批上传云端（实测涨到 202 条）
+ *   3. 多端同题不同 id，云端合并出重复题
+ *
+ * 现在 id 已改为由来源标题派生的确定性值（见 core/parser.ts 的 stableId），
+ * 老数据靠这里按 source 对齐一次，把用户的学习记录接回正确的题上。
+ *
+ * 返回 changed=false 表示本地已经是干净状态（不必写回，避免每次开页面都落一次盘）。
+ */
+export function reconcileBuiltins(
+  state: PersistedState,
+  builtin: Problem[],
+): { state: PersistedState; changed: boolean } {
+  const bySource = new Map(builtin.map((p) => [p.source, p]));
+  const idMap = new Map<string, string>();
+  const imported: Problem[] = [];
+
+  for (const p of state.problems) {
+    const b = bySource.get(p.source);
+    if (!b) {
+      imported.push(p); // 用户导入题，原样保留
+      continue;
+    }
+    if (p.id !== b.id) idMap.set(p.id, b.id);
+  }
+
+  // 内置题永远以代码包为准（题干 / 解析可能也更新过），用户导入题排在后面
+  const problems = [...builtin, ...imported];
+  const alreadyClean =
+    idMap.size === 0 &&
+    state.problems.length === problems.length &&
+    problems.every((p, i) => state.problems[i].id === p.id && state.problems[i].source === p.source);
+  if (alreadyClean) return { state, changed: false };
+
+  const mapId = (id: string): string => idMap.get(id) ?? id;
+
+  const wrongBook: Record<string, WrongEntry> = {};
+  for (const [k, v] of Object.entries(state.wrongBook)) wrongBook[mapId(k)] = v;
+
+  const flags: Record<string, string> = {};
+  for (const [k, v] of Object.entries(state.flags)) flags[mapId(k)] = v;
+
+  const history = state.history.map((h) => (idMap.has(h.id) ? { ...h, id: mapId(h.id) } : h));
+
+  const exams = state.exams.map((e) =>
+    e.detail.some((d) => idMap.has(d.id))
+      ? { ...e, detail: e.detail.map((d) => (idMap.has(d.id) ? { ...d, id: mapId(d.id) } : d)) }
+      : e,
+  );
+
+  return { state: { ...state, problems, wrongBook, flags, history, exams }, changed: true };
+}

@@ -33,6 +33,7 @@ import {
   emptyState,
   parseBackup,
   exportBackup,
+  reconcileBuiltins,
   type PersistedState,
 } from '../repository';
 import { LocalStorageAdapter } from '../localAdapter';
@@ -40,6 +41,7 @@ import { IndexedDBAdapter } from '../indexedDbAdapter';
 import { selectAdapter } from '../index';
 import { CloudAdapter } from '../cloudAdapter';
 import { STORAGE_KEY } from '../types';
+import type { Problem } from '../../types';
 
 // 可切换的云服务配置 mock：默认 null（纯本地语义），个别用例再打开
 const cfgState = vi.hoisted(() => ({
@@ -157,5 +159,85 @@ describe('备份解析', () => {
   });
   it('非法 JSON 抛错并带可提示信息', () => {
     expect(() => parseBackup('not json')).toThrow(/JSON/);
+  });
+});
+
+function mkP(id: string, source: string): Problem {
+  return {
+    id,
+    source,
+    type: 'fill',
+    knowledge: [],
+    difficulty: 3,
+    score: null,
+    group: '',
+    hint: '',
+    pitfall: '',
+    stem: 'x',
+    options: [],
+    answer: '1',
+    answerAlt: [],
+    solution: '',
+  };
+}
+
+/**
+ * 老数据修复：早期题目 id 是随机的（每次开页面都变），而错题本 / 标记 / 历史 /
+ * 模考明细全部以 id 为键 —— 不按来源标题对齐一次，用户的学习记录就全是孤儿键。
+ */
+describe('reconcileBuiltins（老数据按来源对齐）', () => {
+  const builtin = [mkP('q_a', 'A'), mkP('q_b', 'B')];
+
+  it('换掉旧 id，并把错题本 / 标记 / 历史 / 模考明细一起重映射', () => {
+    const legacy: PersistedState = {
+      ...emptyState(),
+      problems: [mkP('old_a', 'A'), mkP('old_b', 'B'), mkP('imp', '我自己导入的题')],
+      wrongBook: { old_a: { count: 2, lastWrong: 1, mastered: false } },
+      flags: { old_b: 'star' },
+      history: [{ id: 'old_a', result: 'wrong', ts: 1 }],
+      exams: [
+        {
+          ts: 1,
+          source: 's',
+          minutes: 10,
+          used: 5,
+          score: 5,
+          total: 10,
+          right: 0,
+          partial: 0,
+          wrong: 1,
+          blank: 0,
+          auto: false,
+          detail: [{ id: 'old_b', source: 'B', result: 'wrong', sc: 0 }],
+        },
+      ],
+    };
+
+    const { state, changed } = reconcileBuiltins(legacy, builtin);
+
+    expect(changed).toBe(true);
+    expect(state.problems.map((p) => p.id)).toEqual(['q_a', 'q_b', 'imp']); // 内置题在前
+    expect(state.wrongBook.q_a).toBeDefined();
+    expect(state.wrongBook.old_a).toBeUndefined();
+    expect(state.flags.q_b).toBe('star');
+    expect(state.history[0].id).toBe('q_a');
+    expect(state.exams[0].detail[0].id).toBe('q_b');
+  });
+
+  it('本地只剩一部分内置题时补全', () => {
+    const partial: PersistedState = { ...emptyState(), problems: [mkP('q_a', 'A')] };
+    const { changed, state } = reconcileBuiltins(partial, builtin);
+    expect(changed).toBe(true);
+    expect(state.problems.map((p) => p.id)).toEqual(['q_a', 'q_b']);
+  });
+
+  it('已经是干净数据 → changed=false，且不产生新对象（避免每次开页面都落一次盘）', () => {
+    const clean: PersistedState = {
+      ...emptyState(),
+      problems: [mkP('q_a', 'A'), mkP('q_b', 'B')],
+    };
+    const { changed, state } = reconcileBuiltins(clean, builtin);
+    expect(changed).toBe(false);
+    expect(state).toBe(clean);
   });
 });

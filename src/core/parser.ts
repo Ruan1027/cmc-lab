@@ -20,7 +20,31 @@
  */
 import type { Problem, ProblemType } from '../types';
 import { normKnowledgeList } from './knowledge';
-import { uid } from '../utils/id';
+
+/**
+ * 题目 ID：从**来源标题**派生的确定性值。
+ *
+ * ⚠️ 这里绝对不能用 `Date.now()` / 随机数（项目早期用过 `uid()`，栽过一次）。
+ * 内置题库是**每次打开页面重新解析**的，id 一旦随机，同一道题在每个会话里
+ * 就是不同的题：
+ *   1. 同步子集按 id 剥离内置题会失效 → 101 道内置题被当成「用户导入题」整批
+ *      上传云端，多端合并后题库翻倍（实测 101 → 202 → 还会继续涨）
+ *   2. 错题本 / 标记 / 练习历史 / 模考明细全部以 id 为键 → 刷新一次全部对不上号，
+ *      表现为「刚做的题、刚设的东西，重开就没了」
+ *   3. 多端同题不同 id，云端互相看不出是同一道题
+ *
+ * 用 source（形如「2024 第十六届CMC预赛 非数学A类 填空1」，题库里稳定且唯一）
+ * 而不是题干，是为了「修正题干里的错别字/公式」时用户的错题本不会跟着失效。
+ */
+function stableId(source: string): string {
+  // FNV-1a 32 位；配上长度后缀，百来道题的实际碰撞概率可以忽略
+  let h = 0x811c9dc5;
+  for (let i = 0; i < source.length; i++) {
+    h ^= source.charCodeAt(i);
+    h = Math.imul(h, 0x01000193) >>> 0;
+  }
+  return `q_${h.toString(16)}_${source.length}`;
+}
 
 /** 中文字段名 → 数据字段名（允许同义写法） */
 export const FIELD_MAP: Record<string, string> = {
@@ -60,7 +84,7 @@ function extractScore(stem: string): number | null {
 
 function emptyProblem(source: string): Problem {
   return {
-    id: uid(),
+    id: stableId(source),
     source,
     type: 'fill',
     knowledge: [],
@@ -81,6 +105,8 @@ function emptyProblem(source: string): Problem {
 export function parseMarkdown(text: string): Problem[] {
   const blocks = text.split(/^##\s+/m).filter((b) => b.trim());
   const problems: Problem[] = [];
+  // 同一份文档里出现同名标题（重复导入）时加序号消歧：id 既要确定、也不能撞
+  const usedIds = new Set<string>();
 
   for (const block of blocks) {
     const lines = block.split('\n');
@@ -142,7 +168,15 @@ export function parseMarkdown(text: string): Problem[] {
     flush();
 
     if (!p.score) p.score = extractScore(p.stem);
-    if (p.stem || p.answer) problems.push(p);
+    if (p.stem || p.answer) {
+      if (usedIds.has(p.id)) {
+        let n = 2;
+        while (usedIds.has(`${p.id}#${n}`)) n += 1;
+        p.id = `${p.id}#${n}`;
+      }
+      usedIds.add(p.id);
+      problems.push(p);
+    }
   }
 
   return problems;

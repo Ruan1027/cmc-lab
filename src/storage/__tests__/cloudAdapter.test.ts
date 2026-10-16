@@ -2,6 +2,7 @@ import { describe, it, expect, beforeEach, vi } from 'vitest';
 import {
   toSyncedPayload,
   applyPayload,
+  buildBuiltinIndex,
   mergeLWW,
   fingerprintPayload,
   type RemoteBackend,
@@ -133,11 +134,20 @@ beforeEach(() => {
 
 describe('remote 纯逻辑', () => {
   it('toSyncedPayload 剥离内置题，只留导入题', () => {
-    const builtinIds = new Set(['b1', 'b2']);
+    const builtin = [mkProblem('b1'), mkProblem('b2')];
     const state = mkState({ problems: [mkProblem('b1'), mkProblem('b2'), mkProblem('imp1')] });
-    const p = toSyncedPayload(state, builtinIds);
+    const p = toSyncedPayload(state, buildBuiltinIndex(builtin));
     expect(p.importedProblems.map((x) => x.id)).toEqual(['imp1']);
     expect(p.stats).toBe(state.stats);
+  });
+
+  it('内置题剥离：id 对不上时用来源标题兜底（防旧数据 id 漂移导致整批泄漏）', () => {
+    const builtin = [mkProblem('b1')];
+    // 模拟「本地存的题 id 与当前代码包不一致」的旧数据
+    const drifted = { ...mkProblem('x'), source: 'src-b1' };
+    const state = mkState({ problems: [drifted, mkProblem('imp1')] });
+    const p = toSyncedPayload(state, buildBuiltinIndex(builtin));
+    expect(p.importedProblems.map((x) => x.id)).toEqual(['imp1']);
   });
 
   it('applyPayload 合并内置题 + 导入题', () => {
@@ -182,6 +192,36 @@ describe('remote 纯逻辑', () => {
     expect(fingerprintPayload(mkPayload({ flags: { x: 'star' } }))).not.toBe(
       fingerprintPayload(mkPayload({ flags: { x: 'nose' } })),
     );
+  });
+});
+
+/**
+ * 线上事故的直接复现（真实题库）：
+ * 题目 id 曾经由 uid() 生成 —— 每次打开页面重新解析内置题库，同一道题 id 都会变。
+ * 于是「按 id 剥离内置题」失效，101 道内置题被当成用户导入题整批上传，
+ * 云端 importedProblems 涨到 202 条，多端合并后题库翻倍。
+ */
+describe('内置题剥离（真实题库，防 id 漂移回归）', () => {
+  it('本地题的 id 全是旧会话的随机值时，仍一道内置题都不上传', () => {
+    const builtin = loadBuiltinProblems();
+    const drifted = builtin.map((p, i) => ({ ...p, id: `old_session_${i}` }));
+    const state = mkState({ problems: drifted });
+
+    const payload = toSyncedPayload(state, buildBuiltinIndex(builtin));
+
+    expect(payload.importedProblems).toHaveLength(0);
+  });
+
+  it('本地旧数据 + 云端脏 payload 合并后仍是 101 题（不会翻倍）', () => {
+    const builtin = loadBuiltinProblems();
+    const drifted = builtin.map((p, i) => ({ ...p, id: `old_session_${i}` }));
+    // 云端那条脏 payload：importedProblems 里全是内置题（事故现场就是 202 条）
+    const dirty = mkPayload({ importedProblems: drifted });
+
+    const merged = applyPayload(mkState({ problems: drifted }), dirty, builtin);
+
+    expect(merged.problems).toHaveLength(101);
+    expect(new Set(merged.problems.map((p) => p.id)).size).toBe(101);
   });
 });
 
