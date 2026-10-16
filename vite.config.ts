@@ -98,6 +98,10 @@ function loadCloudConfigLiteral(single: boolean): string {
   }
 }
 
+function hasCloudConfig(): boolean {
+  return fs.existsSync(nodePath.resolve(process.cwd(), 'cloud.config.json'));
+}
+
 /**
  * 两种构建模式：
  * - 默认（`npm run build`）：产出 dist/，用于部署在线版或打包 App
@@ -107,6 +111,9 @@ function loadCloudConfigLiteral(single: boolean): string {
  */
 export default defineConfig(({ mode }) => {
   const single = mode === 'single';
+  // 没有云配置（GitHub Pages / fork）或单文件版 → 把云 SDK 换成空壳。
+  // 「纯本地版」语义上就不该带云客户端代码，顺带省约 75 KB。
+  const stubCloudSdk = single || !hasCloudConfig();
   return {
     plugins: [
       react(),
@@ -118,10 +125,7 @@ export default defineConfig(({ mode }) => {
     base: './',
     resolve: {
       alias: [
-        // 单文件离线版把云 SDK 换成空壳：它永远不会被调用（配置是 null、协议是 file:），
-        // 但静态 import 会把 ~290KB 后端代码打进 HTML。Release 附件要能双击即用，
-        // 体积值得省。类型仍走真实包，只有打包时替换。
-        ...(single
+        ...(stubCloudSdk
           ? [
               {
                 find: /^@tencent-ai\/workbuddy-cloud-sdk$/,
