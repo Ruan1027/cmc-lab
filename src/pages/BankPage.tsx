@@ -24,6 +24,7 @@ export function BankPage() {
   const [page, setPage] = useState(0);
   const [preview, setPreview] = useState<Problem | null>(null);
   const [text, setText] = useState('');
+  const [pasteText, setPasteText] = useState('');
   const [dragging, setDragging] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
   const restoreRef = useRef<HTMLInputElement>(null);
@@ -71,16 +72,23 @@ export function BankPage() {
     a.click();
   };
 
+  /** 导入备份：覆盖语义，所以先确认再解析；导入后 persist 会自动把新数据推上云端（已登录时） */
+  const doRestore = (raw: string) => {
+    if (!raw.trim()) {
+      notify('备份内容为空');
+      return;
+    }
+    if (!confirm('导入备份会覆盖当前全部数据，确定继续？建议先导出当前备份。')) return;
+    try {
+      restoreBackup(raw);
+      notify('备份已导入');
+    } catch (err) {
+      notify((err as Error).message);
+    }
+  };
+
   const restoreFromFile = (file: File) => {
-    if (!confirm('恢复备份将覆盖当前全部数据，确定继续？建议先导出当前备份。')) return;
-    void file.text().then((t) => {
-      try {
-        restoreBackup(t);
-        notify('备份已恢复');
-      } catch (err) {
-        notify((err as Error).message);
-      }
-    });
+    void file.text().then(doRestore);
   };
 
   return (
@@ -141,10 +149,13 @@ export function BankPage() {
       </div>
 
       <div className="card">
-        <h2>💾 数据备份（建议定期导出）</h2>
+        <h2>💾 数据备份与迁移</h2>
         <div className="hint">
           你的做题进度、错题、模考记录都存在<strong>当前浏览器</strong>里。换浏览器、清缓存或重装都会丢数据，
-          <strong>请定期导出备份</strong>。在线版已支持账号云同步（右上角「登录 / 同步」），登录后进度自动在多端同步；导出备份仍建议定期做，作为额外保险。
+          <strong>请定期导出备份</strong>。
+          <br />
+          在线版登录后会自动多端同步（右上角「登录 / 同步」）：<strong>首次登录会把本机已有进度自动上传到云端</strong>，
+          不需要手动点任何按钮。换设备时，登录同一账号即可；没有账号或想搬到别的浏览器，则用下面的导出 / 导入。
         </div>
         <div className="actions">
           <button
@@ -153,10 +164,10 @@ export function BankPage() {
               download(exportJSON(), `cmc-backup-${Date.now()}.json`, 'application/json')
             }
           >
-            📤 导出备份 (JSON)
+            📤 导出备份 (.json)
           </button>
-          <button className="btn" onClick={() => restoreRef.current?.click()}>
-            📥 恢复备份
+          <button className="btn btn-pri" onClick={() => restoreRef.current?.click()}>
+            📥 导入备份文件
           </button>
           <button
             className="btn ghost"
@@ -169,10 +180,30 @@ export function BankPage() {
             重置数据
           </button>
         </div>
+        <details className="paste-import">
+          <summary>没有备份文件？在这里粘贴备份文本导入（手机上更方便）</summary>
+          <textarea
+            value={pasteText}
+            placeholder='把导出备份的 JSON 全文粘贴到这里（以 {"version": 开头的整段内容）'
+            onChange={(e) => setPasteText(e.target.value)}
+          />
+          <div className="actions">
+            <button
+              className="btn"
+              disabled={!pasteText.trim()}
+              onClick={() => {
+                doRestore(pasteText);
+                setPasteText('');
+              }}
+            >
+              从文本导入
+            </button>
+          </div>
+        </details>
         <input
           ref={restoreRef}
           type="file"
-          accept=".json"
+          accept=".json,application/json"
           hidden
           onChange={(e) => {
             const file = e.target.files?.[0];

@@ -416,10 +416,13 @@ export function AccountModal({ onClose }: { onClose: () => void }) {
               <div className="sync-state">{SYNC_TEXT[auth.syncStatus] ?? ''}</div>
             </div>
             <p className="hint">
-              你的做题进度、错题、模考记录会在登录后自动在设备间同步（内置题库不同步，各端本地重建）。
+              你的做题进度、错题、模考记录会自动在设备间同步（内置题库不同步，各端本地重建）。
+              <br />
+              换设备登录同一账号即可看到；<strong>本机已有的进度在首次登录时已自动上传</strong>，
+              平时不需要动下面这个按钮。
             </p>
             <button className="btn" type="button" disabled={busy} onClick={() => uploadLocalData()}>
-              上传本地数据到云端（合并）
+              强制上传本机数据到云端（覆盖）
             </button>
             <button
               className="btn btn-err"

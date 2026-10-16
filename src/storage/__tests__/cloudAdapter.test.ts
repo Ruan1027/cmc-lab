@@ -3,6 +3,7 @@ import {
   toSyncedPayload,
   applyPayload,
   mergeLWW,
+  fingerprintPayload,
   type RemoteBackend,
   type RemoteRecord,
   type SyncedPayload,
@@ -94,7 +95,31 @@ function makeRemote() {
   return { remote, calls, setRecord: (r: RemoteRecord | null) => (record = r) };
 }
 
+/** Node 环境没有 localStorage：CloudAdapter 的同步元数据（lastSyncAt / 指纹）要用到它 */
+class MemStorage {
+  private m = new Map<string, string>();
+  getItem(k: string): string | null {
+    return this.m.has(k) ? (this.m.get(k) as string) : null;
+  }
+  setItem(k: string, v: string): void {
+    this.m.set(k, String(v));
+  }
+  removeItem(k: string): void {
+    this.m.delete(k);
+  }
+  clear(): void {
+    this.m.clear();
+  }
+  key(i: number): string | null {
+    return Array.from(this.m.keys())[i] ?? null;
+  }
+  get length(): number {
+    return this.m.size;
+  }
+}
+
 beforeEach(() => {
+  (globalThis as unknown as { localStorage: MemStorage }).localStorage = new MemStorage();
   sdkState.cloud = null;
   useAuthStore.setState({
     user: null,
@@ -148,6 +173,15 @@ describe('remote 纯逻辑', () => {
     const { state, adoptedRemote } = mergeLWW(local, remote, Date.now(), [mkProblem('b1')]);
     expect(adoptedRemote).toBe(false);
     expect(state.history.length).toBe(1);
+  });
+
+  it('fingerprintPayload：同内容同指纹，改一个字段就不同', () => {
+    expect(fingerprintPayload(mkPayload({ flags: { x: 'star' } }))).toBe(
+      fingerprintPayload(mkPayload({ flags: { x: 'star' } })),
+    );
+    expect(fingerprintPayload(mkPayload({ flags: { x: 'star' } }))).not.toBe(
+      fingerprintPayload(mkPayload({ flags: { x: 'nose' } })),
+    );
   });
 });
 
@@ -218,6 +252,94 @@ describe('CloudAdapter', () => {
     const ca = new CloudAdapter({ local: adapter, remote, getUserId: () => 'u1', debounceMs: 50 });
     await ca.clear();
     expect(calls.clear).toBe(1);
+  });
+});
+
+/**
+ * 回归测试：登录之后必须**自己**把本机数据推上去，不能等用户去点
+ * 「上传本地数据到云端」。这一块之前是坏的 —— 云端没有记录时 load 直接返回本地，
+ * 什么都不推，用户看到「已登录」但数据其实一直在本机。
+ */
+describe('登录后自动同步（不需要手动点上传）', () => {
+  const entry = (n: number) => ({ count: n, lastWrong: n, mastered: false });
+
+  it('云端还没这个账号的记录 → 把本机数据作为种子自动推上去', async () => {
+    const { remote, calls, setRecord } = makeRemote();
+    const { adapter } = memAdapter();
+    const ca = new CloudAdapter({ local: adapter, remote, getUserId: () => 'u1', debounceMs: 50 });
+
+    await adapter.save(mkState({ wrongBook: { x: entry(1) } }));
+    setRecord(null); // 新账号：云端一片空白
+
+    const loaded = await ca.load();
+
+    expect(calls.load).toBe(1);
+    expect(calls.save).toBe(1); // ← 关键：没点任何按钮就推了
+    expect(calls.saved[0].userId).toBe('u1');
+    expect(calls.saved[0].payload.wrongBook.x).toBeDefined();
+    expect(ca.seededOnLastLoad).toBe(true);
+    expect(loaded?.wrongBook.x).toBeDefined();
+    expect(useAuthStore.getState().syncStatus).toBe('synced');
+  });
+
+  it('云端不比本地新、但本机内容变了（登出期间的改动）→ 补推，云端不会一直落后', async () => {
+    const { remote, calls } = makeRemote();
+    const { adapter } = memAdapter();
+    const ca = new CloudAdapter({ local: adapter, remote, getUserId: () => 'u1', debounceMs: 50 });
+
+    await adapter.save(mkState({ wrongBook: { a: entry(1) } }));
+    await ca.load(); // 种子推送
+    expect(calls.save).toBe(1);
+
+    // 本机又攒了新数据，但没经过 save 推送（模拟登出状态下只写本地）
+    await adapter.save(mkState({ wrongBook: { a: entry(1), b: entry(2) } }));
+
+    await ca.load();
+    expect(calls.save).toBe(2);
+    expect(calls.saved[1].payload.wrongBook.b).toBeDefined();
+  });
+
+  it('本机内容与上次推送的一致 → 不重复写云端（避免每次刷新都白写一次）', async () => {
+    const { remote, calls } = makeRemote();
+    const { adapter } = memAdapter();
+    const ca = new CloudAdapter({ local: adapter, remote, getUserId: () => 'u1', debounceMs: 50 });
+
+    await adapter.save(mkState({ history: [{ id: 'a', result: 'correct', ts: 1 }] }));
+    await ca.load();
+    await ca.load();
+
+    expect(calls.save).toBe(1);
+    expect(ca.seededOnLastLoad).toBe(false);
+  });
+
+  it('未登录时不种子推送（云端一个字都不写）', async () => {
+    const { remote, calls } = makeRemote();
+    const { adapter } = memAdapter();
+    const ca = new CloudAdapter({ local: adapter, remote, getUserId: () => null, debounceMs: 50 });
+
+    await adapter.save(mkState({ wrongBook: { x: entry(1) } }));
+    await ca.load();
+
+    expect(calls.load).toBe(0);
+    expect(calls.save).toBe(0);
+    expect(ca.seededOnLastLoad).toBe(false);
+  });
+
+  it('云端已有更新的数据 → 采用云端，不把本机旧数据推回去', async () => {
+    const { remote, calls, setRecord } = makeRemote();
+    const { adapter } = memAdapter();
+    const ca = new CloudAdapter({ local: adapter, remote, getUserId: () => 'u1', debounceMs: 50 });
+
+    await adapter.save(mkState({ wrongBook: { old: entry(1) } }));
+    setRecord({
+      payload: mkPayload({ wrongBook: { fresh: entry(9) } }),
+      updated_at: new Date(Date.now() + 10000).toISOString(),
+    });
+
+    const loaded = await ca.load();
+    expect(loaded?.wrongBook.fresh).toBeDefined();
+    expect(loaded?.wrongBook.old).toBeUndefined();
+    expect(calls.save).toBe(0);
   });
 });
 

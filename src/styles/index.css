@@ -873,3 +873,32 @@ textarea {
   color: var(--err);
   font-size: 13px;
 }
+
+/* 备份文本导入：手机上从聊天/邮件里复制粘贴，比翻文件选择器好用 */
+.paste-import {
+  margin-top: 14px;
+  border-top: 1px solid var(--line);
+  padding-top: 12px;
+}
+.paste-import summary {
+  cursor: pointer;
+  font-size: 13px;
+  color: var(--pri);
+  list-style: none;
+}
+.paste-import summary::-webkit-details-marker {
+  display: none;
+}
+.paste-import summary::before {
+  content: '▸ ';
+}
+.paste-import[open] summary::before {
+  content: '▾ ';
+}
+.paste-import textarea {
+  margin-top: 10px;
+  min-height: 96px;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 12px;
+  line-height: 1.5;
+}

@@ -219,6 +219,9 @@ export const useAppStore = create<AppState & Actions>()((set, get) => {
         },
       });
       if (!base.problems.length) persist();
+      // 首次登录时 CloudAdapter 会把本机数据作为「种子」推上云端 —— 明确告诉用户一句，
+      // 否则「到底同步了没有」只能靠猜（这正是之前必须手动点上传的根因）
+      if (getCloudAdapter()?.seededOnLastLoad) get().notify('本机进度已自动同步到云端');
     },
 
     importMarkdown: (text) => {

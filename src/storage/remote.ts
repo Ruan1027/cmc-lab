@@ -69,6 +69,22 @@ export function applyPayload(
   };
 }
 
+/**
+ * 同步子集的廉价指纹（FNV-1a 32 位 + 长度）。
+ *
+ * 只用来回答一个问题：「和上次与云端一致时相比，内容变了吗」——不需要抗碰撞。
+ * 同一份本地数据多次 stringify 的键顺序是稳定的，所以可以直接对序列化结果求值。
+ */
+export function fingerprintPayload(payload: SyncedPayload): string {
+  const s = JSON.stringify(payload);
+  let h = 0x811c9dc5;
+  for (let i = 0; i < s.length; i++) {
+    h ^= s.charCodeAt(i);
+    h = Math.imul(h, 0x01000193) >>> 0;
+  }
+  return `${h.toString(16)}-${s.length}`;
+}
+
 export interface MergeResult {
   state: PersistedState;
   /** 是否采用了云端数据（用于决定是否写回本地 + 更新 lastSyncAt） */
