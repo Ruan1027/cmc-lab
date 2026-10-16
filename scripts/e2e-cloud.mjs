@@ -20,5 +20,14 @@ const rows = await r.json().catch(() => null);
 check('PostgREST 匿名请求 200', r.status === 200, `HTTP ${r.status}`);
 check('RLS 拦截匿名读取（返回空数组）', Array.isArray(rows) && rows.length === 0, JSON.stringify(rows));
 
+// GitHub OAuth 提供方已启用：/authorize 应 302 跳 github.com 且带我们的 client_id
+const a = await fetch(
+  `${URL_BASE}/auth/v1/authorize?provider=github&redirect_to=${encodeURIComponent('https://ruan1027.github.io/cmc-lab/')}`,
+  { headers: { apikey: PUB }, redirect: 'manual' },
+);
+const loc = a.headers.get('location') || '';
+check('GitHub 登录入口 302 → github.com', a.status === 302 && loc.includes('github.com/login/oauth/authorize'), `HTTP ${a.status} ${loc.slice(0, 90)}`);
+check('回调携带我们的 client_id', loc.includes('client_id=Ov23liHWUAiJj6pNkhYe'), loc ? loc.slice(0, 160) : 'no location');
+
 console.log(ok ? '\nRESULT: ALL PASS' : '\nRESULT: HAS FAILURES');
 process.exit(ok ? 0 : 1);
