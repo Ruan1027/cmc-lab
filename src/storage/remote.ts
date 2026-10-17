@@ -177,14 +177,20 @@ function mergeStats(a: Stats, b: Stats): Stats {
 }
 
 /**
- * 设置按字段取「有意义的那个」：没填过的一侧（默认值）不该把填过的一侧清掉。
- * 组别人人都有默认值，取本地；其余字段谁非默认取谁，都非默认时以本地为准。
+ * 设置合并：**云端优先**（b = 远端），仅在「云端该字段仍是默认值、而本机设过」时退而取本机。
+ *
+ * 为什么不能本机优先：用户的主流预期是「登录 = 把我云端已保存的进度拉下来」。
+ * 如果本机优先，就会出现用户退出后在本机随手改了备考时间、再登录把云端真进度覆盖掉的
+ * 「重置账号」事故（2026-10-17 用户指出）。云端优先后：
+ *   - 换设备 / 清缓存后登录 → 云端进度原样恢复（大众用户预期）
+ *   - 云端没设过某字段而本机设过（老用户首次注册、忘登录补救）→ 保留本机，不丢
+ *   - 错题 / 历史 / 模考仍是并集，本机登录前做的新题照常补上去
  */
 function mergeSettings(a: Settings, b: Settings): Settings {
   const pick = <K extends keyof Settings>(key: K, whenDefault: (v: Settings[K]) => boolean) =>
-    whenDefault(a?.[key]) && !whenDefault(b?.[key]) ? b[key] : a?.[key];
+    whenDefault(b?.[key]) && !whenDefault(a?.[key]) ? a[key] : b?.[key];
   return {
-    group: a?.group ?? b?.group,
+    group: b?.group ?? a?.group,
     examDate: pick('examDate', (v) => !v),
     dailyGoal: pick('dailyGoal', (v) => v === DEFAULT_SETTINGS.dailyGoal),
     examMinutes: pick('examMinutes', (v) => v === DEFAULT_SETTINGS.examMinutes),

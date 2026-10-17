@@ -213,3 +213,31 @@ describe('端到端：合并结果能直接落到本地状态上', () => {
     expect(state.settings.examDate).toBe('2027-03-20');
   });
 });
+
+describe('登录语义：云端优先（大众用户预期，2026-10-17 修正）', () => {
+  it('本机退出后改了备考时间，再登录不覆盖云端已存的备考时间', () => {
+    // 云端（主设备）存了 2027-03-20，本机退出后随手改成了 2027-06-01
+    const remote = payloadOf(mkState({ settings: mkSettings({ examDate: '2027-03-20' }) }));
+    const local = payloadOf(mkState({ settings: mkSettings({ examDate: '2027-06-01' }) }));
+    const merged = mergePayloads(local, remote, 0);
+    expect(merged.settings.examDate).toBe('2027-03-20'); // 云端胜出，不被重置
+  });
+
+  it('云端没设过某设置而本机设过 → 保留本机（老用户注册 / 忘登录补救不丢）', () => {
+    const remote = payloadOf(mkState()); // 云端全默认
+    const local = payloadOf(mkState({ settings: mkSettings({ examDate: '2027-09-09' }) }));
+    expect(mergePayloads(local, remote, 0).settings.examDate).toBe('2027-09-09');
+  });
+
+  it('清缓存的空设备登录 → 云端进度（设置 + 错题 + 历史）完整恢复', () => {
+    const remote: RemoteRecord = {
+      payload: payloadOf(richState()),
+      updated_at: new Date().toISOString(),
+    };
+    const local = payloadOf(mkState()); // 空设备
+    const merged = mergePayloads(local, remote.payload, 0);
+    expect(merged.settings.examDate).toBe('2027-03-20');
+    expect(merged.wrongBook.b1?.count).toBe(2);
+    expect(merged.history).toHaveLength(1);
+  });
+});
