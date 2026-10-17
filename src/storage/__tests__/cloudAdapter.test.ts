@@ -3,7 +3,6 @@ import {
   toSyncedPayload,
   applyPayload,
   buildBuiltinIndex,
-  mergeLWW,
   fingerprintPayload,
   type RemoteBackend,
   type RemoteRecord,
@@ -164,25 +163,6 @@ describe('remote 纯逻辑', () => {
     };
     const merged = applyPayload(null, payload, builtin);
     expect(merged.problems.map((x) => x.id).sort()).toEqual(['b1', 'imp1']);
-  });
-
-  it('mergeLWW：云端更新则采用云端', () => {
-    const remote: RemoteRecord = {
-      payload: mkPayload({ wrongBook: { x: { count: 1, lastWrong: 1, mastered: false } } }),
-      updated_at: new Date(Date.now() + 1000).toISOString(),
-    };
-    const { state, adoptedRemote } = mergeLWW(mkState(), remote, 0, [mkProblem('b1')]);
-    expect(adoptedRemote).toBe(true);
-    expect(state.wrongBook.x).toBeDefined();
-  });
-
-  it('mergeLWW：云端不比本地新则保留本地', () => {
-    const old = new Date(Date.now() - 100000).toISOString();
-    const remote: RemoteRecord = { payload: mkPayload(), updated_at: old };
-    const local = mkState({ history: [{ id: 'a', result: 'correct', ts: 1 }] });
-    const { state, adoptedRemote } = mergeLWW(local, remote, Date.now(), [mkProblem('b1')]);
-    expect(adoptedRemote).toBe(false);
-    expect(state.history.length).toBe(1);
   });
 
   it('fingerprintPayload：同内容同指纹，改一个字段就不同', () => {
@@ -365,7 +345,7 @@ describe('登录后自动同步（不需要手动点上传）', () => {
     expect(ca.seededOnLastLoad).toBe(false);
   });
 
-  it('云端已有更新的数据 → 采用云端，不把本机旧数据推回去', async () => {
+  it('云端有本机没有的内容 → 并集，两边的错题都保留并回写云端', async () => {
     const { remote, calls, setRecord } = makeRemote();
     const { adapter } = memAdapter();
     const ca = new CloudAdapter({ local: adapter, remote, getUserId: () => 'u1', debounceMs: 50 });
@@ -377,9 +357,12 @@ describe('登录后自动同步（不需要手动点上传）', () => {
     });
 
     const loaded = await ca.load();
+    // 云端的进来
     expect(loaded?.wrongBook.fresh).toBeDefined();
-    expect(loaded?.wrongBook.old).toBeUndefined();
-    expect(calls.save).toBe(0);
+    // 本机离线期间加的也**不该**被云端覆盖掉 —— 这正是整包 LWW 翻车的地方
+    expect(loaded?.wrongBook.old).toBeDefined();
+    // 并集比云端多 → 回写一次云端，让另一台设备也能拿到本机这份
+    expect(calls.save).toBe(1);
   });
 });
 

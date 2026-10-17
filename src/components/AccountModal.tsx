@@ -13,9 +13,18 @@ const SYNC_TEXT: Record<string, string> = {
   idle: '未同步',
   syncing: '同步中…',
   synced: '已同步',
-  offline: '离线（仅本地）',
-  error: '同步失败，将自动重试',
+  offline: '离线（改动已存本机，联网后自动补传）',
+  error: '同步失败：云端拒绝了请求，请重新登录',
 };
+
+/** 「3 分钟前」这种相对时间 —— 同步是个看不见的动作，得让用户能自己确认 */
+function syncAgo(ts: number): string {
+  const s = Math.max(0, Math.round((Date.now() - ts) / 1000));
+  if (s < 60) return '刚刚';
+  if (s < 3600) return `${Math.round(s / 60)} 分钟前`;
+  if (s < 86400) return `${Math.round(s / 3600)} 小时前`;
+  return `${Math.round(s / 86400)} 天前`;
+}
 
 /**
  * 账户 / 云同步弹窗
@@ -35,6 +44,7 @@ const SYNC_TEXT: Record<string, string> = {
 export function AccountModal({ onClose }: { onClose: () => void }) {
   const auth = useAuthStore();
   const uploadLocalData = useAppStore((s) => s.uploadLocalData);
+  const syncNow = useAppStore((s) => s.syncNow);
   const flushCloud = useAppStore((s) => s.flushCloud);
 
   const [tab, setTab] = useState<'login' | 'register'>('login');
@@ -413,7 +423,10 @@ export function AccountModal({ onClose }: { onClose: () => void }) {
                 已登录：<strong>{auth.username}</strong>
                 {auth.user?.email ? <span className="sync-ind">（{auth.user.email}）</span> : null}
               </div>
-              <div className="sync-state">{SYNC_TEXT[auth.syncStatus] ?? ''}</div>
+              <div className="sync-state">
+                {SYNC_TEXT[auth.syncStatus] ?? ''}
+                {auth.lastSyncAt ? ` · ${syncAgo(auth.lastSyncAt)}` : ''}
+              </div>
             </div>
             <p className="hint">
               你的做题进度、错题、模考记录会自动在设备间同步（内置题库不同步，各端本地重建）。
@@ -421,8 +434,35 @@ export function AccountModal({ onClose }: { onClose: () => void }) {
               换设备登录同一账号即可看到；<strong>本机已有的进度在首次登录时已自动上传</strong>，
               平时不需要动下面这个按钮。
             </p>
-            <button className="btn" type="button" disabled={busy} onClick={() => uploadLocalData()}>
-              强制上传本机数据到云端（覆盖）
+            <button
+              className="btn btn-pri"
+              type="button"
+              disabled={busy}
+              onClick={() =>
+                run(async () => {
+                  await syncNow();
+                })
+              }
+            >
+              🔄 立即同步（双向合并）
+            </button>
+            <button
+              className="btn"
+              type="button"
+              disabled={busy}
+              onClick={() => {
+                // 这个按钮是**覆盖**语义：云端独有的内容会被抹掉。
+                // 正常情况下自动同步是「取并集」，不会丢东西，所以必须先讲清楚再执行。
+                if (
+                  !confirm(
+                    '这会以「本机数据」整体覆盖云端，另一台设备上还没同步过来的记录会被清掉。\n\n确定继续？',
+                  )
+                )
+                  return;
+                uploadLocalData();
+              }}
+            >
+              以本机数据覆盖云端
             </button>
             <button
               className="btn btn-err"

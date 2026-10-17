@@ -94,7 +94,7 @@ MVP 用 localStorage（零依赖，Capacitor 环境可用）。
 
 ```
 ┌──────────────────────────────────────────────┐
-│ CloudAdapter（有登录态时包装本地适配器）       │  load: 拉云端→mergeLWW→写回本地   │
+│ CloudAdapter（有登录态时包装本地适配器）       │  load: 拉云端→并集合并→双向补齐  │
 │                                              │  save: 本地落盘 + 防抖上传         │
 ├──────────────────────────────────────────────┤
 │ LocalStorageAdapter / IndexedDBAdapter        │  纯本地，按运行环境选择            │
@@ -109,12 +109,31 @@ MVP 用 localStorage（零依赖，Capacitor 环境可用）。
 - 未配置 / 未登录 / 离线 → `CloudAdapter` 安全降级为纯本地，行为与旧版一致
 - 云配置由构建期注入（`cloud.config.json` → define 常量），仓库里不含真实地址
 
-### 同步子集与 LWW
+### 同步子集与合并策略
 
-- `toSyncedPayload(state, builtinIds)`：从全局状态抽取 `SyncedPayload`
+- `toSyncedPayload(state, builtinIndex)`：从全局状态抽取 `SyncedPayload`
   （`wrongBook/stats/history/exams/settings/flags/importedProblems`），**剥离内置 101 题**
-- `mergeLWW(local, remote, lastSyncAt, builtin)`：仅当 `remote.updated_at > lastSyncAt` 才采用远端字段，避免把旧本地数据写回
-- `applyPayload(local, payload, builtin)`：把云端数据合并回本地状态
+- `mergePayloads(local, remote, lastSyncAt, builtinIndex)`：**按字段取并集**，不是整包覆盖
+- `applyPayload(local, payload, builtin)`：把合并结果落回本地状态（内置题永远以代码包为准）
+
+**为什么不是 LWW（Last-Write-Wins）**。最初的实现是「谁的时间戳新，整包覆盖另一方」，
+线上直接翻车：用户先在电脑用了很久，再用手机登录 —— 手机本地是空的，一登录就把
+空数据推上云端，电脑下次打开时云端时间戳更新，于是电脑的备考时间、错题、历史
+**全被空数据覆盖**。学习数据里「更新」不等于「更完整」：一台刚装的设备永远最新，
+也永远最空。所以改成并集：
+
+| 字段 | 合并规则 |
+| --- | --- |
+| `history` / `exams` | 并集（按 `id+ts` / `ts+source+score` 去重），只增 |
+| `wrongBook` | 条目级：计数取大、掌握状态取更保守；本机删掉的不会复活（用 `lastSyncAt` 区分「本机删的」与「别处新加的」） |
+| `flags` | 并集，本机优先；删除语义同上 |
+| `stats` | 逐桶取较大值 —— 累计量不该被任何一侧的 0 拉平 |
+| `settings` | 逐字段取「非默认」的那个：没填过的一侧不该把填过的一侧清掉 |
+| `importedProblems` | 按 id 去重（顺带滤掉内置题，防脏数据越积越多） |
+
+`updated_at` 现在只用于判断「要不要同步」，不再决定「谁赢」。
+`fingerprintPayload` 走规范化序列化（对象键排序），否则合并重排键顺序会让
+内容相同的两份数据算出不同指纹，导致每次开页面都白推一次。
 
 ### 账号（src/auth）
 

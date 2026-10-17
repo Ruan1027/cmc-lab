@@ -13,9 +13,10 @@
 import type { StorageAdapter } from './types';
 import { emptyState, type PersistedState } from './repository';
 import {
+  applyPayload,
   buildBuiltinIndex,
   fingerprintPayload,
-  mergeLWW,
+  mergePayloads,
   toSyncedPayload,
   type BuiltinIndex,
   type RemoteBackend,
@@ -104,7 +105,7 @@ export class CloudAdapter implements StorageAdapter {
     const userId = this.getUserId();
     if (!userId || !this.remote) return localState; // 未登录 / 未配置 → 纯本地
 
-    // 本机当前的同步子集：①③ 两个分支都要用它，先算一次
+    // 本机当前的同步子集：种子推送与合并两个分支都要用它，先算一次
     const localPayload = toSyncedPayload(localState ?? emptyState(), this.builtinIndex);
     this.seededOnLastLoad = false;
     try {
@@ -119,33 +120,32 @@ export class CloudAdapter implements StorageAdapter {
         return localState;
       }
 
-      const { state, adoptedRemote } = mergeLWW(
-        localState,
-        remote,
+      // ② 有记录 → 合并成并集，两边各自补齐。
+      //    这里**不看谁的时间戳新**：学习数据里「更新」不等于「更完整」——
+      //    一台刚登录的空设备时间戳最新、内容最空，整包覆盖会把另一台的有效
+      //    数据（备考时间、错题、历史）直接抹掉（线上真实事故，2026-10-16）。
+      const mergedPayload = mergePayloads(
+        localPayload,
+        remote.payload,
         meta.lastSyncAt,
-        this.builtinProblems,
+        this.builtinIndex,
       );
+      const localHash = fingerprintPayload(localPayload);
+      const mergedHash = fingerprintPayload(mergedPayload);
+      const remoteHash = fingerprintPayload(remote.payload);
 
-      // ② 云端更新 → 采用云端，本地被覆盖
-      if (adoptedRemote) {
+      let state = localState ?? emptyState();
+      if (mergedHash !== localHash) {
+        // 云端带来了本机没有的东西：新设备首次登录，或别的设备新做的题
+        state = applyPayload(localState, mergedPayload, this.builtinProblems);
         await this.local.save(state);
-        const ts = Date.parse(remote.updated_at);
-        // 记下指纹：此刻本地内容 == 云端内容，下次不必再推
-        writeMeta({
-          ...meta,
-          lastSyncAt: ts,
-          lastRemoteHash: fingerprintPayload(toSyncedPayload(state, this.builtinIndex)),
-        });
-        useAuthStore.getState().setSync('synced', ts);
-        return state;
       }
-
-      // ③ 云端不比本地新 → 保留本地。但本地可能领先（登出期间做的题、
-      //    或者刚从别的设备导入过备份），指纹对不上就补推一次；
-      //    否则云端会一直落后，用户以为同步了、其实没有。
-      if (fingerprintPayload(localPayload) !== meta.lastRemoteHash) {
-        await this.pushNow(localPayload);
+      if (mergedHash !== remoteHash) {
+        // 本机领先：登出期间做的题、刚导入的备份，或是被空设备冲掉后要补回来
+        await this.pushNow(mergedPayload);
       }
+      writeMeta({ ...meta, lastSyncAt: Date.now(), lastRemoteHash: mergedHash });
+      useAuthStore.getState().setSync('synced', Date.now());
       return state;
     } catch (e) {
       // 「被拒」是身份/权限问题（要重新登录），不是网络问题：两者要分开显示，
@@ -182,9 +182,12 @@ export class CloudAdapter implements StorageAdapter {
     await this.pushNow();
   }
 
-  /** 把当前完整状态立即上传（老用户迁移：把本地数据推到云端） */
-  async uploadCurrent(state: PersistedState): Promise<void> {
-    await this.pushNow(toSyncedPayload(state, this.builtinIndex));
+  /**
+   * 把当前完整状态**整体覆盖**云端（用户明确要求「以本机为准」时才用）。
+   * 返回是否成功，好让 UI 说人话而不是假装成功。
+   */
+  async uploadCurrent(state: PersistedState): Promise<boolean> {
+    return this.pushNow(toSyncedPayload(state, this.builtinIndex));
   }
 
   /** 把一次推送真正发出去；返回是否成功（失败会保留待推送内容，5s 后重试） */

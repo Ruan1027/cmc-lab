@@ -796,6 +796,18 @@ textarea {
   white-space: nowrap;
 }
 
+/* 时间戳是次要信息：更淡，且窄屏直接收掉，免得挤掉状态文字 */
+.sync-ago {
+  color: var(--muted, var(--sub));
+  opacity: 0.75;
+}
+
+@media (max-width: 480px) {
+  .sync-ago {
+    display: none;
+  }
+}
+
 .modal-overlay {
   position: fixed;
   inset: 0;

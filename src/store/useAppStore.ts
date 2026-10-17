@@ -148,6 +148,8 @@ interface Actions {
   resetAll: () => void;
   /** 老用户迁移：把当前本地数据立即上传到云端 */
   uploadLocalData: () => void;
+  /** 手动触发一次双向同步（推本机改动 + 拉云端合并） */
+  syncNow: () => Promise<void>;
   /** 把待推送的改动立刻刷上云端（退出登录 / 关页面前调用，避免丢最后一次改动） */
   flushCloud: () => Promise<void>;
 }
@@ -398,8 +400,26 @@ export const useAppStore = create<AppState & Actions>()((set, get) => {
         exams: s.exams,
         practice: null,
       };
-      void a.uploadCurrent(snapshot);
-      get().notify('已把本地数据上传到云端');
+      void a.uploadCurrent(snapshot).then((ok) => {
+        get().notify(ok ? '已用本机数据覆盖云端' : '上传失败，稍后会自动重试');
+      });
+    },
+
+    /**
+     * 手动触发一次双向同步：先把本机改动推上去，再拉云端合并回本地。
+     *
+     * 自动同步其实一直在跑，但它是个看不见的动作 —— 换设备时用户没法判断
+     * 「到底同步了没有」，给个按钮让他能当场确认，比让他猜强。
+     */
+    syncNow: async () => {
+      const a = getCloudAdapter();
+      if (!a) {
+        get().notify('当前环境未启用云同步');
+        return;
+      }
+      await a.flush();
+      await get().hydrate();
+      get().notify('已与云端同步');
     },
 
     flushCloud: async () => {
