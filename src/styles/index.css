@@ -886,6 +886,64 @@ textarea {
   font-size: 13px;
 }
 
+/* ===== 登录 / 注册 独立落地页 ===== */
+.auth-page {
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  background: var(--bg);
+}
+.auth-card {
+  width: 100%;
+  max-width: 380px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+.auth-head {
+  text-align: center;
+  margin-bottom: 4px;
+}
+.auth-title {
+  font-size: 26px;
+  margin: 0;
+  letter-spacing: 0.5px;
+}
+.auth-sub {
+  color: var(--sub);
+  margin: 6px 0 0;
+  font-size: 14px;
+}
+.auth-subtitle {
+  margin: 0;
+  font-size: 16px;
+}
+.auth-links {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  align-items: center;
+  margin-top: 2px;
+}
+.link-btn {
+  background: none;
+  border: none;
+  color: var(--pri);
+  font-size: 13px;
+  cursor: pointer;
+  padding: 2px 4px;
+}
+.link-btn:hover {
+  text-decoration: underline;
+}
+.link-btn:disabled {
+  opacity: 0.5;
+  cursor: default;
+  text-decoration: none;
+}
+
 /* 备份文本导入：手机上从聊天/邮件里复制粘贴，比翻文件选择器好用 */
 .paste-import {
   margin-top: 14px;

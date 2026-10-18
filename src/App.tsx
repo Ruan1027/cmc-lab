@@ -13,6 +13,9 @@ import { ReportPage } from './pages/ReportPage';
 import { PwaInstall } from './components/PwaInstall';
 import { AccountButton } from './components/AccountButton';
 import { SyncIndicator } from './components/SyncIndicator';
+import { LoginPage } from './pages/LoginPage';
+import { RegisterPage } from './pages/RegisterPage';
+import { useEntryStore } from './store/useEntryStore';
 
 type PageKey =
   | 'practice'
@@ -42,20 +45,28 @@ export function App() {
   const hydrated = useAppStore((s) => s.hydrated);
   const toast = useAppStore((s) => s.toast);
   const problems = useAppStore((s) => s.problems);
+  const entry = useEntryStore((s) => s.entry);
+  const setEntry = useEntryStore((s) => s.setEntry);
 
-  // 先初始化鉴权（恢复会话 / 处理 GitHub 回调），再 hydrate 拉取云端合并
+  // 先初始化鉴权（恢复会话 / 处理 GitHub 回调），再 hydrate 拉取云端合并。
+  // 已登录的回访用户直接进主页，不必再看登录页；游客保持默认登录页。
   useEffect(() => {
     let cancelled = false;
     (async () => {
       await useAuthStore.getState().init();
+      if (!cancelled && useAuthStore.getState().user) setEntry('home');
       if (!cancelled) await useAppStore.getState().hydrate();
     })();
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [setEntry]);
 
   const Current = PAGES.find((p) => p.key === page)?.Component ?? PracticePage;
+
+  // 落地页：登录页 / 注册页独立于主页，游客免登录可浏览主页
+  if (entry === 'login') return <LoginPage />;
+  if (entry === 'register') return <RegisterPage />;
 
   return (
     <div className="app">
