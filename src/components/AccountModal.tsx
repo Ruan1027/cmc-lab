@@ -46,6 +46,7 @@ export function AccountModal({ onClose }: { onClose: () => void }) {
   const uploadLocalData = useAppStore((s) => s.uploadLocalData);
   const syncNow = useAppStore((s) => s.syncNow);
   const flushCloud = useAppStore((s) => s.flushCloud);
+  const restoreBackup = useAppStore((s) => s.restoreBackup);
 
   const [tab, setTab] = useState<'login' | 'register'>('login');
   const [forgot, setForgot] = useState(false);
@@ -68,6 +69,15 @@ export function AccountModal({ onClose }: { onClose: () => void }) {
   const [fpSent, setFpSent] = useState(false);
 
   const [claimName, setClaimName] = useState('');
+
+  /**
+   * 老用户迁移引导：注册成功后触发。
+   *   'none'   ：不显示（正常账号视图）
+   *   'ask'    ：问是不是「无账号就用过本应用」的老用户
+   *   'import' ：提供备份文件上传窗口，导入后同步云端
+   */
+  const [migrate, setMigrate] = useState<'none' | 'ask' | 'import'>('none');
+  const [raw, setRaw] = useState('');
 
   const run = async (fn: () => Promise<void>): Promise<void> => {
     setBusy(true);
@@ -124,7 +134,10 @@ export function AccountModal({ onClose }: { onClose: () => void }) {
       if (badPwd) throw new Error(badPwd);
       setSecret(password);
       await auth.completeRegister(regName, password, regCode);
-      await finish();
+      // 注册成功：先 hydrate（加载本机可能已有的进度 + 触发首次种子推送），
+      // 再问是不是「无账号的老用户」，需要导入之前导出的备份。不直接关窗。
+      await useAppStore.getState().hydrate();
+      setMigrate('ask');
     });
 
   // ---------- 忘记密码 ----------
@@ -160,6 +173,26 @@ export function AccountModal({ onClose }: { onClose: () => void }) {
       // 退出前先把待推送的改动刷上云端，否则最后几秒的操作会丢
       await flushCloud();
       await auth.signOut();
+      onClose();
+    });
+
+  // ---------- 老用户迁移：导入备份并同步云端 ----------
+  const handleBackupFile = (file?: File) => {
+    if (!file) return;
+    file
+      .text()
+      .then((t) => setRaw(t))
+      .catch(() => setMsg('读取文件失败'));
+  };
+
+  const doImportBackup = () =>
+    run(async () => {
+      if (!raw.trim()) throw new Error('请先选择备份文件或粘贴备份文本');
+      if (!confirm('导入会覆盖当前数据，确定继续？')) return;
+      restoreBackup(raw);
+      // 老用户迁移的核心目的：把导入的数据立即推上云端并拉回合并
+      await syncNow();
+      setMigrate('none');
       onClose();
     });
 
@@ -386,7 +419,82 @@ export function AccountModal({ onClose }: { onClose: () => void }) {
           </div>
         )}
 
-        {signedIn && auth.username === null && (
+        {signedIn && migrate === 'ask' && (
+          <div className="auth-body">
+            <h3>👋 欢迎，{regName}！</h3>
+            <p className="hint">
+              你以前有没有用过本应用（在线版 / App / 单文件 Release 版），但当时
+              <strong>没有账号</strong>？
+              <br />
+              如果用过，可以从之前的设备导出备份文件，在这里导入并同步到云端，进度不丢。
+            </p>
+            <button
+              className="btn btn-pri"
+              type="button"
+              disabled={busy}
+              onClick={() => setMigrate('import')}
+            >
+              是，我要导入之前的备份
+            </button>
+            <button
+              className="btn"
+              type="button"
+              disabled={busy}
+              onClick={() => {
+                setMigrate('none');
+                onClose();
+              }}
+            >
+              否，我是全新用户
+            </button>
+          </div>
+        )}
+
+        {signedIn && migrate === 'import' && (
+          <div className="auth-body">
+            <h3>📥 导入之前的备份</h3>
+            <p className="hint">
+              选择之前从「题库 → 数据备份与迁移」导出的 .json 文件，或粘贴备份文本。
+              导入会<strong>覆盖</strong>当前数据，但正是你想要的旧进度迁移。
+            </p>
+            <input
+              className="inp"
+              type="file"
+              accept=".json,application/json"
+              onChange={(e) => {
+                handleBackupFile(e.target.files?.[0]);
+                e.target.value = '';
+              }}
+            />
+            <textarea
+              placeholder='也可以粘贴备份 JSON（以 {"version": 开头）'
+              value={raw}
+              onChange={(e) => setRaw(e.target.value)}
+            />
+            {msg && <div className="err">{msg}</div>}
+            <button
+              className="btn btn-pri"
+              type="button"
+              disabled={busy || !raw.trim()}
+              onClick={() => void doImportBackup()}
+            >
+              {busy ? '处理中…' : '导入并同步云端'}
+            </button>
+            <button
+              className="btn"
+              type="button"
+              disabled={busy}
+              onClick={() => {
+                setMigrate('none');
+                onClose();
+              }}
+            >
+              跳过
+            </button>
+          </div>
+        )}
+
+        {signedIn && migrate === 'none' && auth.username === null && (
           <div className="auth-body">
             <div className="acct-info">
               <div>
@@ -416,7 +524,7 @@ export function AccountModal({ onClose }: { onClose: () => void }) {
           </div>
         )}
 
-        {signedIn && auth.username !== null && (
+        {signedIn && migrate === 'none' && auth.username !== null && (
           <div className="auth-body">
             <div className="acct-info">
               <div>
